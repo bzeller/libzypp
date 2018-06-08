@@ -991,6 +991,9 @@ void RpmDb::syncTrustedKeys( SyncTrustedKeyBits mode_r )
     callback::TempConnect<KeyRingSignals> tempDisconnect;
     librpmDb::db_const_iterator keepDbOpen; // just to keep a ref.
 
+    //list of keys we expect to be imported
+    std::set<Edition> expectedKeys = rpmKeys;
+
     TmpFile tmpfile( getZYpp()->tmpPath() );
     {
       std::ofstream tmpos( tmpfile.path().c_str() );
@@ -1005,10 +1008,23 @@ void RpmDb::syncTrustedKeys( SyncTrustedKeyBits mode_r )
     try
     {
       getZYpp()->keyRing()->multiKeyImport( tmpfile.path(), true /*trusted*/);
+      for ( const PublicKey &key : getZYpp()->keyRing()->trustedPublicKeys() ) {
+        expectedKeys.erase( key.gpgPubkeyEdition() );
+      }
+
+      if ( expectedKeys.size() ) {
+        for ( const Edition &notImportedKey : expectedKeys ) {
+          MIL << "Could not import key:" << str::Format("gpg-pubkey-%1%-%2%") % notImportedKey.version() % notImportedKey.release() << " into zypp keyring" << endl;
+        }
+
+        callback::SendReport<KeyRingReport> rep;
+        rep->reportNonImportedKeys(expectedKeys);
+      }
+
     }
     catch (Exception &e)
     {
-      ERR << "Could not import keys into in zypp keyring" << endl;
+      ERR << "Could not import keys into zypp keyring" << endl;
     }
   }
 
