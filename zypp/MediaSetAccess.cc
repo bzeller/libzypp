@@ -171,6 +171,20 @@ IMPL_PTR_TYPE(MediaSetAccess);
     return op.result;
   }
 
+  Pathname MediaSetAccess::provideOptionalFile( const Pathname & file, unsigned media_nr )
+  {
+    try
+    {
+      if ( doesFileExist( file, media_nr ) )
+	return provideFile( file, media_nr, PROVIDE_NON_INTERACTIVE );
+    }
+    catch ( const media::MediaFileNotFoundException & excpt_r )
+    { ZYPP_CAUGHT( excpt_r ); }
+    catch ( const media::MediaNotAFileException & excpt_r )
+    { ZYPP_CAUGHT( excpt_r ); }
+   return Pathname();
+  }
+
   ManagedFile MediaSetAccess::provideFileFromUrl(const Url &file_url, ProvideFileOptions options)
   {
     Url url(file_url);
@@ -189,18 +203,17 @@ IMPL_PTR_TYPE(MediaSetAccess);
     return tmpFile;
   }
 
-  Pathname MediaSetAccess::provideOptionalFile( const Pathname & file, unsigned media_nr )
+  ManagedFile MediaSetAccess::provideOptionalFileFromUrl( const Url & file_url )
   {
     try
     {
-      if ( doesFileExist( file, media_nr ) )
-	return provideFile( file, media_nr, PROVIDE_NON_INTERACTIVE );
+      return provideFileFromUrl( file_url, PROVIDE_NON_INTERACTIVE );
     }
     catch ( const media::MediaFileNotFoundException & excpt_r )
     { ZYPP_CAUGHT( excpt_r ); }
     catch ( const media::MediaNotAFileException & excpt_r )
     { ZYPP_CAUGHT( excpt_r ); }
-   return Pathname();
+   return ManagedFile();
   }
 
   bool MediaSetAccess::doesFileExist(const Pathname & file, unsigned media_nr )
