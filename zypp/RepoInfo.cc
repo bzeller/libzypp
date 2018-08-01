@@ -502,7 +502,7 @@ namespace zypp
 
   Pathname RepoInfo::provideKey(const std::string &keyID_r, const Pathname &targetDirectory_r)
   {
-
+    MIL << "Check for " << keyID_r << " at " << targetDirectory_r << endl;
     filesystem::TmpDir tmpKeyRingDir;
     KeyRing tempKeyRing(tmpKeyRingDir.path());
 
@@ -532,7 +532,9 @@ namespace zypp
     if ( !tempKeyRing.isKeyTrusted(keyID_r) ) {
       for ( const Url &url : gpgKeyUrls() ) {
         try {
-          ManagedFile f = MediaSetAccess::provideFileFromUrl( url );
+          ManagedFile f = MediaSetAccess::provideOptionalFileFromUrl( url );
+	  if ( f->empty() )
+	    continue;
 
           PublicKey key(f);
           if ( !key.isValid() )
