@@ -392,8 +392,10 @@ multifetchworker::~multifetchworker()
 	  curl_easy_setopt(_curl, CURLOPT_HEADERDATA, (void *)0);
           _request->_context->toEasyPool(_url.getHost(), _curl);
 	}
-      else
+      else {
+        XXX << "Cleaned up worker: " << _url.getHost() << " "<< _curl << endl;
         curl_easy_cleanup(_curl);
+        }
       _curl = 0;
     }
   if (_pid)
@@ -1592,15 +1594,19 @@ CURL *MediaMultiCurl::fromEasyPool(const string &host) const
     return 0;
   CURL *ret = _easypool[host];
   _easypool.erase(host);
+  XXX << "From easy pool: " << host << " "<< ret << endl;
   return ret;
 }
 
 void MediaMultiCurl::toEasyPool(const std::string &host, CURL *easy) const
 {
+  XXX << "To easy pool: " << host << " "<< easy << endl;
   CURL *oldeasy = _easypool[host];
   _easypool[host] = easy;
-  if (oldeasy)
+  if (oldeasy) {
+      XXX << "Replaced old easy handle: " << host << " "<< easy << " " << oldeasy << endl;
     curl_easy_cleanup(oldeasy);
+  }
 }
 
   } // namespace media
