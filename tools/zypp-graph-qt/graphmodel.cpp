@@ -75,8 +75,6 @@ void Graph::load(  const zypp::sat::Solvable::IdType solvId, const int levels )
       boost::put( boost::edge_weight, *this, e.first, 1);
     }
   }
-
-  qDebug()<<"Finished loading";
   emit endGraphReset();
 }
 

@@ -7,12 +7,13 @@ Flickable {
     id: scrollview
     clip: true
 
+    contentHeight: graphView.height
+    contentWidth:  graphView.width
+
     property alias model: graphView.model
     property alias zoom: graphView.zoom
     property var graphItem: graphView
-
-    contentHeight: graphView.height
-    contentWidth:  graphView.width
+    property int selectedSolvId: -1
 
     ScrollBar.vertical: ScrollBar { }
     ScrollBar.horizontal: ScrollBar { }
@@ -53,8 +54,8 @@ Flickable {
                     MouseArea {
                         anchors.fill: parent
                         onClicked: {
-                            console.log("I was clicked " +  GraphItem);
                             MyGraphItem.doSelectItem( container );
+                            scrollview.selectedSolvId = solvId;
                         }
                     }
                 }
@@ -72,11 +73,6 @@ Flickable {
 
                 }
             }
-        }
-
-        Rectangle {
-            id: packageDescItem
-
         }
     }
 }

@@ -80,3 +80,11 @@ QHash<int, QByteArray> ZyppPoolModel::roleNames() const
 
   return roles;
 }
+
+QModelIndex ZyppPoolModel::solvIdToIndex( const uint solvId ) const
+{
+  int row = _allSolvables.indexOf( solvId );
+  if ( row == -1 )
+    return QModelIndex();
+  return index( row, 0 );
+}

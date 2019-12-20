@@ -136,6 +136,48 @@ ApplicationWindow {
         }
     }
 
+    Rectangle {
+        id: nodeInfo
+        z: graphView.z + 1
+        visible: graphView.selectedSolvId !== -1
+        opacity: 0.25
+        border.width: 1
+
+        width: layout.preferredWidth
+        height: layout.preferredHeight
+
+        anchors.top: graphView.top
+        anchors.left: graphView.left
+
+        property string solvName
+        property string solvRepos
+
+        property var solvId
+        solvId: graphView.selectedSolvId
+
+        onSolvIdChanged: {
+            var index = pool.solvIdToIndex( solvId )
+            if (!index.isValid) return;
+            solvName = pool.data( index, 0 );
+            solvRepos = pool.data( index, 0x0101 );
+        }
+
+        ColumnLayout {
+            id: layout
+            anchors.fill: parent
+
+            RowLayout {
+                Label { text: "Name" }
+                Label { text: nodeInfo.solvName }
+            }
+
+            RowLayout {
+                Label { text: "Repository" }
+                Label { text: nodeInfo.solvRepos }
+            }
+        }
+    }
+
     ColumnLayout {
         anchors.fill: parent
 

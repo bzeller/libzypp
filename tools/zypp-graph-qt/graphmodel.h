@@ -7,6 +7,7 @@
 #include <boost/graph/graph_traits.hpp>
 #include <boost/graph/adjacency_list.hpp>
 #include <boost/graph/topology.hpp>
+#include <boost/range/iterator_range.hpp>
 #include <zypp/sat/Solvable.h>
 
 namespace boost {
@@ -38,6 +39,9 @@ using GraphData = boost::adjacency_list<boost::vecS, boost::vecS, boost::bidirec
 using UndirectedGraphData = boost::adjacency_list<boost::vecS, boost::vecS, boost::undirectedS, VertexPosProperty, EdgeWeightProperty>;
 using Vertex = boost::graph_traits<GraphData>::vertex_descriptor;
 using Edge   = boost::graph_traits<GraphData>::edge_descriptor;
+
+using VertexDescriptorRange = boost::iterator_range< boost::graph_traits<GraphData>::vertex_iterator >;
+using EdgeDescriptorRange   = boost::iterator_range< boost::graph_traits<GraphData>::edge_iterator >;
 
 class TestSetup;
 
