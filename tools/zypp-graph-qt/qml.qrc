@@ -3,5 +3,6 @@
         <file>main.qml</file>
         <file>GraphView.qml</file>
         <file>TreeWidget.qml</file>
+        <file>TestcaseSettingsView.qml</file>
     </qresource>
 </RCC>

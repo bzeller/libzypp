@@ -1,4 +1,4 @@
-#include <QGuiApplication>
+#include <QApplication>
 #include <QQmlApplicationEngine>
 #include <QAbstractItemModel>
 #include <QSortFilterProxyModel>
@@ -6,6 +6,9 @@
 #include "graphmodel.h"
 #include "graphitem.h"
 #include "zypppoolmodel.h"
+#include "mainwindow.h"
+#include "testcase/testcasesetup.h"
+#include "testcase/channel.h"
 
 #include <zypp/ZConfig.h>
 #include <zypp/sat/Pool.h>
@@ -17,8 +20,9 @@ int main(int argc, char *argv[])
     QCoreApplication::setOrganizationDomain("suse.de");
     QCoreApplication::setApplicationName("zypp-testcase-viewer");
     QQuickStyle::setStyle("Fusion");
+    QApplication::setStyle("Motif");
 
-    QGuiApplication app(argc, argv);
+    QApplication app(argc, argv);
 
     zypp::ZConfig::instance();
     zypp::Pathname sysRoot("/");
@@ -28,6 +32,13 @@ int main(int argc, char *argv[])
     qmlRegisterType<Graph>("de.suse.zyppgraph", 1, 0, "Graph");
     qmlRegisterType<ZyppPoolModel>("de.suse.zyppgraph", 1, 0, "ZyppPool");
     qmlRegisterType<QSortFilterProxyModel>("de.suse.zyppgraph", 1, 0, "SortModel");
+    qmlRegisterType<TestcaseSetup>("de.suse.zyppgraph", 1, 0, "TestcaseSetup");
+    qmlRegisterUncreatableType<Channel>("de.suse.zyppgraph", 1, 0, "Channel", "Zonkomat");
+
+    MainWindow w;
+    w.show();
+
+#if 0
 
     QQmlApplicationEngine engine;
     const QUrl url(QStringLiteral("qrc:/main.qml"));
@@ -37,6 +48,6 @@ int main(int argc, char *argv[])
                 QCoreApplication::exit(-1);
         }, Qt::QueuedConnection);
     engine.load(url);
-
+#endif
     return app.exec();
 }
