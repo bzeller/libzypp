@@ -430,7 +430,7 @@ void *EventDispatcher::nativeDispatcherHandle() const
   return d_func()->_ctx;
 }
 
-bool EventDispatcher::waitForFdEvent( const int fd, int events , int &revents , int &timeout )
+zyppng::EventDispatcher::WaitResult EventDispatcher::waitForFdEvent( const int fd, int events , int &revents , int &timeout )
 {
   GPollFD pollFd;
   pollFd.fd = fd;
@@ -444,8 +444,15 @@ bool EventDispatcher::waitForFdEvent( const int fd, int events , int &revents , 
     switch ( res ) {
       case 0: //timeout
         timeout = 0;
-        return false;
+        return WaitResult::Timeout;
       case -1: { // interrupt
+        // in case of EINTR we continue after checking the timeout
+        // for all other errors we return false, make sure to not change errno
+        if ( errno != EINTR ) {
+          WAR << "waitForFdEvent failed with errno " << errno << std::endl;
+          return WaitResult::Error;
+        }
+
         // if timeout is -1 we wait until eternity
         if ( timeout == -1 )
           continue;
@@ -453,7 +460,7 @@ bool EventDispatcher::waitForFdEvent( const int fd, int events , int &revents , 
         timeout -= g_timer_elapsed( *timer, NULL );
         if ( timeout < 0 ) timeout = 0;
         if ( timeout <= 0 )
-          return false;
+          return WaitResult::Timeout;
 
         break;
       }
@@ -464,7 +471,7 @@ bool EventDispatcher::waitForFdEvent( const int fd, int events , int &revents , 
   }
 
   revents = gioConditionToEventTypes( (GIOCondition)pollFd.revents, evModeToMask(events) );
-  return true;
+  return WaitResult::Success;
 }
 
 bool EventDispatcher::run_once()

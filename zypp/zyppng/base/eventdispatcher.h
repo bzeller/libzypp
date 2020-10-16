@@ -108,13 +108,24 @@ public:
    */
   void *nativeDispatcherHandle () const;
 
+
+  /*!
+   * Result type for \ref waitForFdEvent.
+   */
+  enum class WaitResult {
+    Error   = -1, //< Waiting on the FD failed with a error
+    Timeout =  0, //< Waiting timed out
+    Success =  1  //< Waiting was successful, check revents which events were triggered
+  };
+
   /*!
    * Waits until one of the requested events in \a events happens on the file descriptor.
    * Use \ref AbstractEventSource::EventTypes to define for which events should be polled.
    * Returns true on success, \a revents will contain the bitwise combination of \ref AbstractEventSource::EventTypes
    * that triggered the wakeup.
+   * In case of a failed system call check errno to get the actual reason for the failure.
    */
-  static bool waitForFdEvent ( const int fd, int events, int &revents, int &timeout );
+  static WaitResult waitForFdEvent( const int fd, int events, int &revents, int &timeout );
 
 protected:
 

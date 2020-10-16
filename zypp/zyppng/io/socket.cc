@@ -706,11 +706,17 @@ namespace zyppng {
     // we can only wait if we are in connecting state
     while ( d->state() == Socket::ConnectingState ) {
       int rEvents = 0;
-      if ( EventDispatcher::waitForFdEvent( d->_socket, AbstractEventSource::Write, rEvents, timeout ) ) {
-        d->onSocketActivated( rEvents );
-      } else {
-        // timeout
-        return false;
+      const auto waitRes = EventDispatcher::waitForFdEvent( d->_socket, AbstractEventSource::Write, rEvents, timeout );
+      switch ( waitRes ) {
+        case EventDispatcher::WaitResult::Success:
+          d->onSocketActivated( rEvents );
+          break;
+        case EventDispatcher::WaitResult::Timeout:
+          return false;
+        case EventDispatcher::WaitResult::Error:
+          d->handleConnectError( errno );
+          abort();
+          return false;
       }
     }
     return d->state() == Socket::ConnectedState;
@@ -733,7 +739,18 @@ namespace zyppng {
         if constexpr ( std::is_same_v<T, SocketPrivate::ConnectedState> || std::is_same_v<T, SocketPrivate::ClosingState> ) {
           if ( s._writeBuffer.size() > 0 ) {
             int rEvents = 0;
-            canContinue = EventDispatcher::waitForFdEvent( d->_socket, AbstractEventSource::Write | AbstractEventSource::Read, rEvents, timeout );
+            const auto waitRes = EventDispatcher::waitForFdEvent( d->_socket, AbstractEventSource::Write | AbstractEventSource::Read, rEvents, timeout );
+            switch ( waitRes ) {
+              case EventDispatcher::WaitResult::Success:
+                canContinue = true;
+                break;
+              case EventDispatcher::WaitResult::Timeout:
+              case EventDispatcher::WaitResult::Error:
+                canContinue = false;
+                break;
+            }
+
+            canContinue = false;
             if ( canContinue ) {
               //this will trigger the bytesWritten signal, we check there if the buffer is empty
               d->onSocketActivated( rEvents );
@@ -758,11 +775,14 @@ namespace zyppng {
     // we can only wait if we are in connected state
     while ( d->state() == Socket::ConnectedState && bytesAvailable() <= 0 ) {
       int rEvents = 0;
-      if ( EventDispatcher::waitForFdEvent( d->_socket,  AbstractEventSource::Read | AbstractEventSource::Error , rEvents, timeout ) ) {
-        d->onSocketActivated( rEvents );
-      } else {
-        //timeout
-        return false;
+      const auto waitRes = EventDispatcher::waitForFdEvent( d->_socket,  AbstractEventSource::Read | AbstractEventSource::Error , rEvents, timeout );
+      switch ( waitRes ) {
+        case EventDispatcher::WaitResult::Success:
+          d->onSocketActivated( rEvents );
+          break;
+        case EventDispatcher::WaitResult::Timeout:
+        case EventDispatcher::WaitResult::Error:
+          return false;
       }
     }
     return bytesAvailable() > 0;
