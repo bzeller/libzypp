@@ -84,17 +84,19 @@ namespace zyppng {
       void onRequestProgress ( NetworkRequest &req, off_t dltotal, off_t dlnow, off_t, off_t );
       void onRequestFinished ( NetworkRequest &req , const NetworkRequestError &err );
 
-      signal<void ( )> _stateFinished;
+      signal<void ( )> _transitionRequired;
     };
 
     // download metalink/zchunk data
     struct prepare_mirrors_t  {
       static constexpr auto stateId = Download::State::PrepareMulti;
+      signal<void ( )> _transitionRequired;
     };
 
-    // download the file in chunks
+    // download the file in one piece
     struct fetch  {
       static constexpr auto stateId = Download::State::Running;
+      signal<void ( )> _transitionRequired;
     };
 
     // download the file in chunks
@@ -106,17 +108,19 @@ namespace zyppng {
       void onRequestProgress ( NetworkRequest &req, off_t dltotal, off_t dlnow, off_t, off_t );
       void onRequestFinished ( NetworkRequest &req , const NetworkRequestError &err );
 
-      signal<void ( )> _stateFinished;
+      signal<void ( )> _transitionRequired;
     };
 
     // finished
     struct success_t {
       static constexpr auto stateId = Download::State::Success;
+      signal<void ( )> _transitionRequired;
     };
 
     // finished
     struct failed_t {
       static constexpr auto stateId = Download::State::Failed;
+      signal<void ( )> _transitionRequired;
     };
 
     template <typename State>
@@ -124,6 +128,11 @@ namespace zyppng {
 
     template <typename State>
     void finishState ( State &s );
+
+    template <typename State>
+    Download::State stateId ( const State & ) {
+      return std::decay_t<State>::stateId;
+    }
 
     std::vector< std::shared_ptr<Request> > _runningRequests;
     std::shared_ptr<NetworkRequestDispatcher> _requestDispatcher;
