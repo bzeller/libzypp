@@ -40,7 +40,12 @@ namespace zyppng {
       using Ptr = std::shared_ptr<Request>;
       using WeakPtr = std::shared_ptr<Request>;
 
-      void connectSignals ( DownloadPrivate &dl );
+      template <typename Receiver>
+      void connectSignals ( Receiver &dl ) {
+        _sigStartedConn  = sigStarted().connect ( sigc::mem_fun( dl, &Receiver::onRequestStarted) );
+        _sigProgressConn = sigProgress().connect( sigc::mem_fun( dl, &Receiver::onRequestProgress) );
+        _sigFinishedConn = sigFinished().connect( sigc::mem_fun( dl, &Receiver::onRequestFinished) );
+      }
       void disconnectSignals ();
 
       std::vector<Block> _myBlocks;
@@ -54,6 +59,71 @@ namespace zyppng {
       connection _sigProgressConn;
       connection _sigFinishedConn;
     };
+
+    // before statemachine is started
+    struct initial_t  {
+      static constexpr auto stateId = Download::State::InitialState;
+    };
+
+    // download metalink/zchunk data
+    struct prepare_t  {
+      static constexpr auto stateId = Download::State::Initializing;
+
+      enum State {
+        Initial,
+        DlRangeOrMetalink, //< First attempt to get the zchunk header, but we might receive metalink data instead
+        DlMetaLink,        //< We got Metalink, lets get the full metalink file or we got no zchunk in the first place
+        DlRangeNoMetaLink, //< Second attempt to get the zchunk header, this time we do not add the metalink headers so we get the real deal
+        PrepareMirrors,    //< Preparing the mirrors we received
+        Finished
+      } state = Initial;
+
+      std::shared_ptr<Request> _request;
+
+      void onRequestStarted  ( NetworkRequest & );
+      void onRequestProgress ( NetworkRequest &req, off_t dltotal, off_t dlnow, off_t, off_t );
+      void onRequestFinished ( NetworkRequest &req , const NetworkRequestError &err );
+
+      signal<void ( )> _stateFinished;
+    };
+
+    // download metalink/zchunk data
+    struct prepare_mirrors_t  {
+      static constexpr auto stateId = Download::State::PrepareMulti;
+    };
+
+    // download the file in chunks
+    struct fetch  {
+      static constexpr auto stateId = Download::State::Running;
+    };
+
+    // download the file in chunks
+    struct fetchmulti_t    {
+      static constexpr auto stateId = Download::State::RunningMulti;
+      std::vector< std::shared_ptr<Request> > _runningRequests;
+
+      void onRequestStarted  ( NetworkRequest & );
+      void onRequestProgress ( NetworkRequest &req, off_t dltotal, off_t dlnow, off_t, off_t );
+      void onRequestFinished ( NetworkRequest &req , const NetworkRequestError &err );
+
+      signal<void ( )> _stateFinished;
+    };
+
+    // finished
+    struct success_t {
+      static constexpr auto stateId = Download::State::Success;
+    };
+
+    // finished
+    struct failed_t {
+      static constexpr auto stateId = Download::State::Failed;
+    };
+
+    template <typename State>
+    void enterState ( State &s );
+
+    template <typename State>
+    void finishState ( State &s );
 
     std::vector< std::shared_ptr<Request> > _runningRequests;
     std::shared_ptr<NetworkRequestDispatcher> _requestDispatcher;

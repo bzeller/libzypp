@@ -73,13 +73,6 @@ namespace zyppng {
       _mirrorControlReadyConn.disconnect();
   }
 
-  void DownloadPrivate::Request::connectSignals(DownloadPrivate &dl)
-  {
-    _sigStartedConn  = sigStarted().connect ( sigc::mem_fun( dl, &DownloadPrivate::onRequestStarted) );
-    _sigProgressConn = sigProgress().connect( sigc::mem_fun( dl, &DownloadPrivate::onRequestProgress) );
-    _sigFinishedConn = sigFinished().connect( sigc::mem_fun( dl, &DownloadPrivate::onRequestFinished) );
-  }
-
   void DownloadPrivate::Request::disconnectSignals()
   {
     _sigStartedConn.disconnect();
@@ -89,6 +82,7 @@ namespace zyppng {
 
   void DownloadPrivate::start()
   {
+    //@BUG Add all running states here
     if ( _state == Download::Initializing ||
          _state == Download::Running ||
          _state == Download::RunningMulti )
@@ -130,7 +124,7 @@ namespace zyppng {
     addNewRequest( initialRequest );
   }
 
-  void DownloadPrivate::setState(Download::State newState)
+  void DownloadPrivate::setState( Download::State newState )
   {
     if ( _state == newState )
       return;
