@@ -9,6 +9,7 @@
 #include <zypp/zyppng/media/network/networkrequesterror.h>
 #include <zypp/zyppng/media/network/private/mirrorcontrol_p.h>
 #include <zypp/media/MediaBlockList.h>
+#include <zypp/zyppng/base/statemachine.h>
 
 #include <deque>
 
@@ -60,10 +61,6 @@ namespace zyppng {
       connection _sigFinishedConn;
     };
 
-    // before statemachine is started
-    struct initial_t  {
-      static constexpr auto stateId = Download::State::InitialState;
-    };
 
     // download metalink/zchunk data
     struct prepare_t  {

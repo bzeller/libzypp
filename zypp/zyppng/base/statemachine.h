@@ -20,6 +20,7 @@
 #include <tuple>
 #include <functional>
 #include <memory>
+#include <iostream>
 
 namespace zyppng {
 
@@ -231,6 +232,8 @@ namespace zyppng {
   template <typename Source, typename Target >
   struct defaultOperation {
 
+    constexpr defaultOperation(){};
+
     template< typename Statemachine >
     std::unique_ptr<Target> operator() ( Statemachine &sm, Source & ) {
       return std::make_unique<Target>( sm );
@@ -238,19 +241,30 @@ namespace zyppng {
 
   };
 
+  template <typename Source, typename Target >
+  constexpr static auto defaultOp = defaultOperation<Source,Target>();
 
   /*!
    * Defines a transition between \a Source and \a Target states.
    * The EventSource \a ev triggers the transition from Source to Target if the condition \a Cond
    * evaluates to true. The operation \a Op is called between exiting the old and entering the new state.
    * It can be used to transfer informations from the old into the new state.
+   *
+   * \tparam Source defines the type of the Source state
+   * \tparam ev takes a member function pointer returning the event trigger signal that is used to trigger the transition to \a Target
+   * \tparam Target defines the type of the Target state
+   * \tparam Cond Defines the transition condition, can be used if the same event could trigger different transitions
+   *         based on a condition
+   * \tparam Op defines the transition operation from Source to Target states,
+   *         this is either a function with the signature:   std::unique_ptr<Target> ( Statemachine &, Source & )
+   *         or it can be a member function pointer of Source with the signature:  std::unique_ptr<Target> ( Source::* ) ( Statemachine & )
    */
   template <
     typename Source,
     detail::EventSource<Source> ev ,
     typename Target,
     auto Cond = defaultCondition<Source>,
-    auto Op  =  defaultOperation<Source, Target>() >
+    auto Op   = &defaultOp<Source, Target> >
   struct Transition {
 
     using SourceType = Source;
@@ -260,6 +274,7 @@ namespace zyppng {
     template< typename Statemachine >
     std::unique_ptr<Target> operator() ( Statemachine &sm, Source &oldState ) {
       using OpType = decltype ( Op );
+      // check if we have a member function pointer
       if  constexpr ( std::is_invocable_v< OpType, Source *, Statemachine & > ) {
         return std::invoke( Op, &oldState, sm );
       } else {
@@ -280,9 +295,10 @@ namespace zyppng {
 
 
   /*!
-   * This defines the actual StateMachine. The first type parameter \a Derived is the Statemachine subclass type, this
-   * is used to pass a reference to the actual implementation into the State functions.
-   * The second template parameter \a StateId should be a enum with a ID for each state the SM can be in.
+   * \brief This defines the actual StateMachine.
+   * \tparam Derived is the Statemachine subclass type, this is used to pass a reference to the actual implementation into the State functions.
+   * \tparam StateId should be a enum with a ID for each state the SM can be in.
+   * \tparam Transitions variadic template argument taking a list of all \ref Transition types the statemachine should support
    *
    */
   template < typename Derived, typename StateId, typename ...Transitions >
@@ -373,6 +389,7 @@ namespace zyppng {
         if constexpr (I >= sizeof...(StateTrans)) {
           return;
         } else {
+          std::cout << "Connecting connecting" << std::endl;
           auto &transition = std::get<I>( transitions );
           transition.eventSource ( &std::forward<State>(nS).wrappedState() ).connect( makeEventCallback< std::decay_t<State> >(transition));
         }
