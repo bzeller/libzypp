@@ -539,6 +539,11 @@ namespace zypp
        */
       std::string multiversionKernels() const;
 
+      /**
+       * Defaults to \c /usr/lib/zypp/tools
+       */
+      Pathname toolsPath() const;
+
       //@}
     public:
       class Impl;

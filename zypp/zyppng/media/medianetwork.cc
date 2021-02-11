@@ -241,7 +241,6 @@ namespace zyppng {
       m.SerializeToString( env.mutable_value() );
 
       //DBG << "Preparing to send messagE: " << env.messagetypename() << " " << env.value().size() << std::endl;
-
       const auto &str = env.SerializeAsString();
       HeaderSizeType msgSize = str.length();
       sock->write( (char *)(&msgSize), sizeof( HeaderSizeType ) );

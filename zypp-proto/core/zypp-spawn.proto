@@ -1,9 +1,44 @@
 syntax = "proto3";
 option optimize_for = LITE_RUNTIME;
 
-package zypp.proto;
+package zypp.spawn.proto;
 
 message SpawnProcess {
-  string path = 1;
-  repeated string env = 2;
+  repeated string argv   = 1;
+  string chroot = 2;
+  string chdir  = 3;
+  bool   resetProgressGroup = 4;
+  bool   dieWithParent      = 5;
+
+  // array of strings in the form of: KEY=VALUE
+  repeated string env       = 6;
+
+  enum FDType {
+    StdIn  = 0;
+    StdOut = 1;
+    StdErr = 2;
+  }
+  repeated FDType fdInTrailer = 7;
+}
+
+message SpawnSuccess {
+  int32 pid = 1;
+}
+
+message RequestFailed {
+  string error = 1;
+}
+
+message WaitPid {
+  int32 pid = 1;
+  bool  wait = 2;
+}
+
+message WaitPidResult {
+  int32 ret = 1;     // will be 0 if process is still running, otherwise pid
+  int32 status = 2;  // the status as reported by waitpid, only valid if ret > 0
+}
+
+message ReleaseProcess {
+  int32 pid = 1;
 }

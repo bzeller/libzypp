@@ -338,6 +338,7 @@ namespace zypp
         , solverUpgradeRemoveDroppedPackages( true )
         , apply_locks_file		( true )
         , pluginsPath			( "/usr/lib/zypp/plugins" )
+        , toolsPath                     ( "/usr/lib/zypp/tools")
       {
         MIL << "libzypp: " LIBZYPP_VERSION_STRING << endl;
         // override_r has higest prio
@@ -701,6 +702,7 @@ namespace zypp
     std::string userData;
 
     Option<Pathname> pluginsPath;
+    Option<Pathname> toolsPath;
 
   private:
     // HACK for bnc#906096: let pool re-evaluate multiversion spec
@@ -1180,6 +1182,9 @@ namespace zypp
 
   Pathname ZConfig::pluginsPath() const
   { return _pimpl->pluginsPath.get(); }
+
+  Pathname ZConfig::toolsPath() const
+  { return _pimpl->toolsPath.get(); }
 
   std::string ZConfig::multiversionKernels() const
   {

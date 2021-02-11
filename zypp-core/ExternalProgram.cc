@@ -33,6 +33,7 @@
 
 #include <zypp-core/zyppng/base/private/linuxhelpers_p.h>
 #include <zypp-core/zyppng/io/private/forkspawnengine_p.h>
+#include <zypp-core/zyppng/io/private/zyppspawnengine_p.h>
 
 using std::endl;
 
@@ -171,7 +172,10 @@ namespace zypp {
         static_cast<zyppng::ForkSpawnEngine&>(*_backend).setUsePty( true );
       } else {
         const std::string fBackend ( zypp::str::asString( ::getenv("ZYPP_FORK_BACKEND") ) );
-        if ( fBackend.empty() || fBackend == "auto" || fBackend == "gspawn" ) {
+        if ( fBackend.empty() || fBackend == "auto" || fBackend == "zspawn" ) {
+          DBG << "Starting process via zypp spawn" << std::endl;
+          _backend = std::make_unique<zyppng::ZyppSpawnEngine>();
+        } else if ( fBackend == "gspawn" ) {
           DBG << "Starting process via glib spawn" << std::endl;
           _backend = std::make_unique<zyppng::GlibSpawnEngine>();
         } else {

@@ -321,6 +321,7 @@ INSTALL( FILES ${LIBZYPP_SOURCE_DIR}/systemCheck DESTINATION ${SYSCONFDIR}/zypp 
 # logrotate config file
 INSTALL( FILES ${LIBZYPP_SOURCE_DIR}/zypp-history.lr DESTINATION ${SYSCONFDIR}/logrotate.d )
 
+ADD_DEFINITIONS(-DZYPP_OVERRIDE_SPAWN_EXECUTABLE="${CMAKE_CURRENT_BINARY_DIR}/tools/zypp-spawn/zypp-spawn")
 
 ####################################################################
 # SUBDIRECTORIES                                                   #
