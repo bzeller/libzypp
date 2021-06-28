@@ -31,7 +31,7 @@ namespace detail {
     WaitForImpl& operator= ( WaitForImpl &&other ) = default;
     WaitForImpl ( WaitForImpl &&other ) = default;
 
-    void operator()( std::vector< std::unique_ptr< AsyncOp > > &&ops ) {
+    void operator()( std::vector< std::shared_ptr< AsyncOp > > &&ops ) {
       assert( _allOps.empty() );
 
       _allOps = std::move( ops );
@@ -55,7 +55,7 @@ namespace detail {
       }
     }
 
-    std::vector< std::unique_ptr<zyppng::AsyncOp<InnerResult>> > _allOps;
+    std::vector< std::shared_ptr<zyppng::AsyncOp<InnerResult>> > _allOps;
     std::vector< InnerResult > _allResults;
   };
 
@@ -65,9 +65,9 @@ namespace detail {
  *  Returns a async operation that waits for all async operations that are passed to it and collects their results,
  *  forwarding them as one
  */
-template < class Res  >
-auto waitFor () {
-  return std::make_unique<detail::WaitForImpl<zyppng::AsyncOp<Res>>>();
+template < class Res >
+auto waitFor ( ) {
+  return std::make_shared<detail::WaitForImpl<zyppng::AsyncOp<Res>>>();
 }
 
 

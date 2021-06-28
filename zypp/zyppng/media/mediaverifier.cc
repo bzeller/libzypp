@@ -6,37 +6,13 @@
 |                         /_____||_| |_| |_|                           |
 |                                                                      |
 ----------------------------------------------------------------------*/
-#ifndef ZYPP_NG_CORE_CONTEXT_H_INCLUDED
-#define ZYPP_NG_CORE_CONTEXT_H_INCLUDED
-
-#include <memory>
+#include "mediaverifier.h"
 
 namespace zyppng {
 
-  class EventLoop;
-  class MirrorControl;
-  class DeviceManager;
-
-  class Context {
-
-  public:
-
-    using Ptr = std::shared_ptr<Context>;
-
-    static Ptr create () {
-      return Ptr( new Context() );
-    }
-
-    std::shared_ptr<EventLoop> evLoop () const;
-    std::shared_ptr<DeviceManager> devMgr () const;
-
-  private:
-    Context();
-    std::shared_ptr<EventLoop>     _zyppEventLoop;
-    std::shared_ptr<DeviceManager> _devMgr;
-
-  };
+  AsyncOpRef<expected<void> > NoVerifier::isDesiredMedia( const DeviceHandler & ) const
+  {
+    return makeReadyResult( expected<void>::success () );
+  }
 
 }
-
-#endif

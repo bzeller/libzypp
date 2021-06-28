@@ -7,7 +7,6 @@ namespace zyppng {
   Context::Context()
   {
     _zyppEventLoop = EventLoop::create();
-    _mirrorControl = MirrorControl::create();
   }
 
   std::shared_ptr<EventLoop> Context::evLoop() const
@@ -15,9 +14,8 @@ namespace zyppng {
     return _zyppEventLoop;
   }
 
-  std::shared_ptr<MirrorControl> Context::mirrorControl()
-  {
-    return _mirrorControl;
+  std::shared_ptr<DeviceManager> Context::devMgr () const {
+    return _devMgr;
   }
 
 }
