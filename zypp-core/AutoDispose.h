@@ -125,6 +125,16 @@ namespace zypp
       : _pimpl( new Impl( value_r, dispose_r ) )
       {}
 
+      /** Ctor taking rvalue and no dispose function. */
+      explicit AutoDispose( value_type &&value_r )
+        : _pimpl( new Impl( std::move(value_r) ) )
+      {}
+
+      /** Ctor taking rvalue and dispose function. */
+      AutoDispose( value_type &&value_r, const Dispose & dispose_r )
+        : _pimpl( new Impl( std::move(value_r), dispose_r ) )
+      {}
+
     public:
 
       /** Provide implicit conversion to \c Tp\&. */
@@ -177,6 +187,13 @@ namespace zypp
         Impl( param_type value_r, const Dispose & dispose_r )
         : _value( value_r )
         , _dispose( dispose_r )
+        {}
+        Impl( value_type &&value_r )
+          : _value( std::move(value_r) )
+        {}
+        Impl( value_type &&value_r, const Dispose & dispose_r )
+          : _value( std::move(value_r) )
+          , _dispose( dispose_r )
         {}
         ~Impl()
         {
