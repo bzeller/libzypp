@@ -42,6 +42,7 @@ namespace zyppng {
 
     bool equals( const Device &other );
     bool isAttached ( ) const;
+    bool isIdle () const;
 
     uint addMount ( std::shared_ptr<DeviceHandler> hdl );
     void delMount ( uint mountId );

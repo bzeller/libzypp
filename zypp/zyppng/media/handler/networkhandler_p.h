@@ -59,6 +59,9 @@ namespace zyppng {
     public:
       NetworkDeviceHandler( std::shared_ptr<Socket> &&backendSocket, Device &dev, const zypp::Url &baseUrl, DeviceManager &parent );
       ~NetworkDeviceHandler() override;
+
+      // DeviceHandler interface
+      bool isIdle() const override;
     protected:
       AsyncOpRef<expected<std::list<std::string>>> getDirInfo( const zypp::Pathname & dirname, bool dots = true ) override;
       AsyncOpRef<expected<zypp::filesystem::DirContent>> getDirInfoExt( const zypp::Pathname &dirname, bool dots = true ) override;

@@ -43,10 +43,10 @@ namespace zyppng {
   {
     public:
       CDRomDeviceHandler( Device &dev, const zypp::Url &baseUrl, DeviceManager &parent );
+
+      // DeviceHandler interface
+      bool isIdle() const override;
   };
 
 }
-
-
-
 #endif

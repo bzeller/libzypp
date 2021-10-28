@@ -42,12 +42,18 @@ namespace zyppng {
 
   struct DelayedJob {
     virtual ~DelayedJob() {}
-    virtual void trigger( DeviceHandler::Ptr devRef ) = 0;
+    virtual void trigger( DeviceHandlerRef devRef ) = 0;
     virtual void setError ( std::exception_ptr excp ) = 0;
   };
 
   struct DelayedProvideJob : public AsyncOp<expected<PathRef>>, public DelayedJob
   { };
+
+  class MediaNoFreeDeviceException : public zypp::media::MediaException
+  {
+  public:
+    MediaNoFreeDeviceException( const uint mediaNr ) : MediaException( zypp::str::Format("No free device to handle requests for %1%") % mediaNr) {}
+  };
 
   class MediaSetHandlerPrivate : public BasePrivate {
     public:
@@ -88,15 +94,18 @@ namespace zyppng {
         int _currMediaNr = -1; //< The currently mounted mediaNr in this device
       };
 
-      expected<zypp::Pathname> createAttachpoint(
-        const zypp::Url &url_r ) const;
+      expected<zypp::Pathname> createAttachpoint( const zypp::Url &url_r ) const;
       zypp::Url rewriteUrl ( const zypp::Url & url_r, const uint medianr ) const;
       int findAvailableBucket ( const uint medianr );
       void schedule ();
+      void scheduleJobsOn ( const uint medianr, DeviceHandlerRef handler );
 
       Context  &_zyppContext;
       zypp::Url _baseUrl; // The baseUrl that we use to request devices and to build requests
       std::map<int, std::vector<std::weak_ptr<DelayedJob>>> _pendingRequests; // pending requests
+
+      std::map<int, AsyncOpRef<expected<void>>>
+        _runningScheduleJobs; //< Currently running schedule Jobs, consider all medias in the map as locked
 
       std::unordered_map<int, MediaVerifierRef> _registeredVerifiers; // the verifiers we have registered for each media nr
 
@@ -187,7 +196,7 @@ namespace zyppng {
     const zypp::Url &url_r, const uint medianr ) const
   {
     std::string scheme = url_r.getScheme();
-    if (scheme == "cd" || scheme == "dvd")
+    if ( medianr == 1 || scheme == "cd" || scheme == "dvd" )
       return url_r;
 
     DBG << "Rewriting url " << url_r << std::endl;
@@ -267,7 +276,12 @@ namespace zyppng {
       if ( availBucket >= 0 )
       {
         // schedule requests
+        continue;
       }
+
+      // check if we are already scheduling jobs for that media nr
+      if ( _runningScheduleJobs.count (key) )
+        continue;
 
       // when we reach here, we have no existing handler that is known to handle the requested medianr
       // we need to check
@@ -304,10 +318,35 @@ namespace zyppng {
                    };
                  });
       }) | waitFor<expected<DeviceHandlerRef>>()
-         | []( std::vector<expected<DeviceHandlerRef>> &&results ) -> expected<void> {
-
+         | [this, key = key]( std::vector<expected<DeviceHandlerRef>> &&results ) -> expected<void> {
+           for ( const auto &res : results ) {
+             if ( !res )
+               continue;
+             // we found a handler that verified, use the first one and schedule jobs on it
+             scheduleJobsOn ( key, res.get () );
+             return expected<void>::success ();
+           }
+           // found nothing, either none of the devices contains the media we are looking for or contains NO media at all
+           MIL << "Could not find a usable handler for media nr " << key << " waiting for more ressources" << std::endl;
+           return expected<void>::error( ZYPP_EXCPT_PTR (MediaNoFreeDeviceException(key)));
          };
+
+      // we cannot remove the op via the pipeline, this would crash since the callback would destroy the last reference to the op while
+      // its still executed
+      if ( aps->isReady () ) {
+
+      } else {
+        aps->connectFunc( &AsyncOp<expected<void>>::sigReady, [this, key=key](){
+            _runningScheduleJobs.erase (key);
+        }, this );
+        _runningScheduleJobs[key] = std::move(aps);
+      }
     }
+  }
+
+  void MediaSetHandlerPrivate::scheduleJobsOn(const uint medianr, DeviceHandlerRef handler)
+  {
+
   }
 
   AsyncOpRef<expected<PathRef> > MediaSetHandler::provideFile( const zypp::OnMediaLocation &file )

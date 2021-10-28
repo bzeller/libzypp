@@ -8,6 +8,7 @@
 ----------------------------------------------------------------------*/
 #include "device.h"
 #include <zypp/base/String.h>
+#include <zypp/zyppng/media/DeviceHandler>
 
 namespace zyppng {
 
@@ -34,6 +35,20 @@ namespace zyppng {
   bool Device::isAttached() const
   {
     return _mountingHandler.size() > 0;
+  }
+
+  bool Device::isIdle() const
+  {
+    if ( !isAttached () )
+      return true;
+
+    for ( const auto &hdl: _mountingHandler ) {
+      auto ptr = hdl.second.lock ();
+      if ( ptr && !ptr->isIdle() )
+        return false;
+    }
+
+    return true;
   }
 
   uint Device::addMount( std::shared_ptr<DeviceHandler> hdl )

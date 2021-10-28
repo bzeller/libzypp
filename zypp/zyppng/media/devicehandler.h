@@ -33,6 +33,13 @@ namespace zyppng {
   template <typename T, typename DT>
   class AsyncDeviceOp;
 
+  class DeviceAttachPoint
+  {
+    public:
+      DeviceAttachPoint( const zypp::Pathname );
+      static void disposeHelper( DeviceAttachPoint &me );
+  };
+
   using DeviceAttachPointRef = zypp::AutoDispose<const zypp::Pathname>;
   #if 0
   class DeviceAttachPointRef : public zypp::AutoDispose<const zypp::Pathname>
@@ -61,6 +68,10 @@ namespace zyppng {
 
     using Ptr = std::shared_ptr<DeviceHandler>;
 
+    template< typename Result, typename Handler >
+    friend class AsyncDeviceOp;
+    friend class PathRefPrivate;
+
     DeviceHandler( Device &dev, const zypp::Url &baseUrl, const zypp::Pathname& localRoot, DeviceManager &parent );
 
     virtual void setAttachPoint ( DeviceAttachPointRef &&ap );
@@ -84,6 +95,7 @@ namespace zyppng {
     /*!
      * The current attach point of the device, this CAN be shared between multiple DeviceHandlers
      */
+
     const DeviceAttachPointRef & attachPoint () const;
 
     /*!
@@ -200,9 +212,10 @@ namespace zyppng {
      **/
      AsyncOpRef<expected<bool>> doesFileExist( const zypp::Pathname & filename );
 
-     template< typename Result, typename Handler >
-     friend class AsyncDeviceOp;
-     friend class PathRefPrivate;
+     /*!
+      * Check if the handler still has pending or running async operations.
+      */
+     virtual bool isIdle () const = 0;
 
   protected:
 

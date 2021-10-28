@@ -124,7 +124,6 @@ namespace zyppng
      // AsyncOpBase interface
     protected:
      void handlerShutdown() override {
-
      }
 
     private:
@@ -223,6 +222,11 @@ namespace zyppng
     // the handler. So there is no need for us to be releasing requests by hand.
     DBG_MEDIA << "NetworkDeviceHandler released, with " << _requests.size() << " nr or requests still running" << std::endl;
     _socket->close();
+  }
+
+  bool NetworkDeviceHandler::isIdle() const
+  {
+    return (_requests.size () == 0);
   }
 
   AsyncOpRef<expected<std::list<std::string>>> NetworkDeviceHandler::getDirInfo( const zypp::Pathname & dirname, bool dots)

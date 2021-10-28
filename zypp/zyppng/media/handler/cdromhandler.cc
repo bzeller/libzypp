@@ -295,5 +295,11 @@ namespace zyppng {
     setDoesLocalMirror( false );
   }
 
+  bool zyppng::CDRomDeviceHandler::isIdle() const
+  {
+    // we are always idle because we can immediately fullfill all requests
+    return true;
+  }
+
 
 }

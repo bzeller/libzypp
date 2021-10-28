@@ -148,7 +148,7 @@ namespace zyppng {
     void setReady ( value_type && val ) {
       if ( _readyCb ) {
         _readyCb( std::move( val ) );
-        _readyCb.swap( std::function<void(value_type &&)>() );
+        _readyCb = {};
       }
       else { //we need to cache the value because no callback is available
         _maybeValue = std::move(val);
@@ -180,7 +180,9 @@ namespace zyppng {
       if ( isReady() ) {
         _readyCb( std::move( _maybeValue.value()) );
         _maybeValue.reset();
-        _readyCb.swap( std::function<void(value_type &&)>() );
+        // reset the callback, it might be a lambda with captured ressources
+        // that need to be released after returning from the func
+        _readyCb = {};
       }
     }
 
