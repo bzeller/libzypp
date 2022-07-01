@@ -5,6 +5,8 @@
 #include <thread>
 #include <string>
 
+typedef struct _GMainContext GMainContext;
+
 namespace zyppng
 {
   class EventDispatcher;
@@ -23,7 +25,7 @@ namespace zyppng
 
     std::shared_ptr<EventDispatcher> dispatcher()
     { return _dispatcher.lock(); }
-    std::shared_ptr<EventDispatcher> ensureDispatcher();
+    std::shared_ptr<EventDispatcher> ensureDispatcher( GMainContext *ctx = 0 );
     void setDispatcher( const std::shared_ptr<EventDispatcher> &disp );
 
 
