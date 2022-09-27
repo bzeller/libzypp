@@ -73,6 +73,7 @@ namespace zyppng {
     std::string nextMediaId () const;
     AttachedMediaInfo &addMedium ( zypp::proto::Capabilities::WorkerType workerType, const zypp::Url &baseUrl, ProvideMediaSpec &spec );
     AttachedMediaInfo &addMedium ( zypp::proto::Capabilities::WorkerType workerType, ProvideQueueWeakRef backingQueue, const std::string &id, const zypp::Url &baseUrl, ProvideMediaSpec &spec );
+    AttachedMediaInfo *findMediumForHandle ( const ProvideMediaHandle &handle );
 
     std::string effectiveScheme ( const std::string &scheme ) const;
 

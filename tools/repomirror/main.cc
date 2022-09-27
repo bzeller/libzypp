@@ -73,14 +73,14 @@ zyppng::AsyncOpRef<zyppng::expected<zyppng::ProvideRes>> provideSolvable ( std::
   }
 
   // enable for more output, but sloooooows the startup time down significantly
-  //output->putMsgTxt( zypp::str::Str() << "Downloading " << pi.asUserString() << " size is: " << pi.downloadSize() << "\n" );
+  // output->putMsgTxt( zypp::str::Str() << "Downloading " << pi.asUserString() << " size is: " << pi.downloadSize() << "\n" );
 
   return prov->provide( handle, oml.filename(), zyppng::ProvideFileSpec( oml ) )
   | [output]( zyppng::expected<zyppng::ProvideRes> &&res ) {
       if ( res ) {
-        output->putMsgTxt( zypp::str::Str() << "File downloaded: " << res->file() << "\n" );
+        output->putMsgTxt( zypp::str::Str() <<  "File downloaded: " << res->file() << "\n" );
       } else {
-        output->putMsgErr( zypp::str::Str() <<   "Failed to download file\n" );
+        output->putMsgErr( zypp::str::Str() <<   "Failed to   download file\n" );
         try
         {
           std::rethrow_exception(res.error());

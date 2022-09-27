@@ -25,7 +25,7 @@ namespace zyppng {
 template < template< class, class... > class Container,
   typename Msg,
   typename Transformation,
-  typename Ret = std::result_of_t<Transformation(Msg)>,
+  typename Ret = std::invoke_result_t<Transformation,Msg&&>,
   typename ...CArgs >
 Container<Ret> transform( Container<Msg, CArgs...>&& val, Transformation transformation )
 {
@@ -37,9 +37,21 @@ Container<Ret> transform( Container<Msg, CArgs...>&& val, Transformation transfo
 template < template< class, class... > class Container,
   typename Msg,
   typename Transformation,
-  typename Ret = std::result_of_t<Transformation(Msg)>,
+  typename Ret = std::invoke_result_t<Transformation,const Msg&>,
   typename ...CArgs >
 Container<Ret> transform( const Container<Msg, CArgs...>& val, Transformation transformation )
+{
+  Container<Ret> res;
+  std::transform( val.begin(), val.end(), std::back_inserter(res), transformation );
+  return res;
+}
+
+template < template< class, class... > class Container,
+  typename Msg,
+  typename Transformation,
+  typename Ret = std::invoke_result_t<Transformation,Msg &>,
+  typename ...CArgs >
+Container<Ret> transform( Container<Msg, CArgs...>& val, Transformation transformation )
 {
   Container<Ret> res;
   std::transform( val.begin(), val.end(), std::back_inserter(res), transformation );

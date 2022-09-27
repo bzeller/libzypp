@@ -48,6 +48,7 @@ namespace zypp
        * \param repos Set of repositories providing patch and delta packages
        */
       DeltaCandidates( const std::list<Repository> & repos, const std::string & pkgname = "" );
+      DeltaCandidates( std::list<Repository> && repos, const std::string & pkgname = "" );
       /** Dtor */
       ~DeltaCandidates();
 

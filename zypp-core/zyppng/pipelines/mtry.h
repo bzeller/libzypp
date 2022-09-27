@@ -20,17 +20,30 @@
 
 namespace zyppng {
 
-  template < typename F
-           , typename Ret = typename std::result_of<F()>::type
-           , typename Exp = expected<Ret, std::exception_ptr>
-           >
-  Exp mtry(F f)
-  {
-      try {
-          return Exp::success(f());
-      } catch (...) {
-          return Exp::error(std::current_exception());
+  namespace detail {
+
+    template  <typename Callback>
+    struct MtryImpl {
+
+      MtryImpl( Callback &&cb ) : _cb( std::move(cb)) { }
+      MtryImpl( const Callback &cb ) : _cb( cb ) { }
+
+      template <typename Msg, typename Ret = std::invoke_result_t<Callback, Msg> >
+      zyppng::expected<Ret> operator() ( Msg &&arg ) {
+        try {
+            return zyppng::expected<Ret>::success( std::invoke( _cb, std::forward<Msg>(arg) ) );
+        } catch (...) {
+            return zyppng::expected<Ret>::error(std::current_exception());
+        }
       }
+      private:
+        Callback _cb;
+    };
+  }
+
+  template < typename F >
+  detail::MtryImpl<F> mtry(F &&f) {
+    return detail::MtryImpl( std::forward<F>(f));
   }
 
 }

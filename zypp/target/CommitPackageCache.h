@@ -20,6 +20,7 @@
 #include <zypp/PoolItem.h>
 #include <zypp/Pathname.h>
 #include <zypp/ManagedFile.h>
+#include <zypp/sat/Transaction.h>
 
 ///////////////////////////////////////////////////////////////////
 namespace zypp
@@ -81,6 +82,12 @@ namespace zypp
       template <class TIterator>
       void setCommitList( TIterator begin_r, TIterator end_r )
       { setCommitList( std::vector<sat::Solvable>( begin_r, end_r  ) ); }
+
+      /*!
+       * Preloads the cache and makes sure all requested items are in the cache
+       * Returns true and sets \ref preloaded to true if all items have been preloaded, otherwise returns false.
+       */
+      bool preloadForTransaction ( std::vector<sat::Transaction::Step> &items );
 
       /** Provide a package. */
       ManagedFile get( const PoolItem & citem_r );

@@ -799,6 +799,15 @@ namespace zypp
   : _pimpl( new Impl( baseTmpDir ) )
   {}
 
+  KeyRing::KeyRing( KeyRing &&other )
+  : _pimpl( std::move( other._pimpl ) )
+  {}
+
+  KeyRing &KeyRing::operator= ( KeyRing &&other )
+  {
+    _pimpl = std::move(other._pimpl);
+  }
+
   KeyRing::~KeyRing()
   {}
 

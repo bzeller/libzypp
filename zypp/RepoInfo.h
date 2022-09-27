@@ -26,6 +26,10 @@
 
 #include <zypp/repo/RepoInfoBase.h>
 
+#include <zypp-media/ng/ProvideFwd>
+#include <zypp-core/zyppng/async/AsyncOp>
+#include <zypp-core/zyppng/pipelines/Expected>
+
 ///////////////////////////////////////////////////////////////////
 namespace zypp
 { /////////////////////////////////////////////////////////////////
@@ -405,6 +409,9 @@ namespace zypp
 
       /** downloads all configured gpg keys into the defined directory */
       Pathname provideKey(const std::string &keyID_r, const Pathname &targetDirectory_r ) const;
+
+       /** downloads all configured gpg keys into the defined directory asynchronously*/
+      static zyppng::AsyncOpRef<zyppng::expected<Pathname>> provideKeyAsync( zyppng::ProvideRef provider_r, RepoInfo &&repo, const std::string &keyID_r, const Pathname &targetDirectory_r  );
 
       /**
        * \short Whether packages downloaded from this repository will be kept in local cache

@@ -1416,68 +1416,14 @@ namespace zypp
         packageCache.setCommitList( steps.begin(), steps.end() );
 
         bool miss = false;
-        if ( policy_r.downloadMode() != DownloadAsNeeded || singleTransMode )
-        {
+        if ( policy_r.downloadMode() != DownloadAsNeeded || singleTransMode ) {
           // Preload the cache. Until now this means pre-loading all packages.
           // Once DownloadInHeaps is fully implemented, this will change and
           // we may actually have more than one heap.
-          for_( it, steps.begin(), steps.end() )
-          {
-            switch ( it->stepType() )
-            {
-              case sat::Transaction::TRANSACTION_INSTALL:
-              case sat::Transaction::TRANSACTION_MULTIINSTALL:
-                // proceed: only install actionas may require download.
-                break;
-
-              default:
-                // next: no download for or non-packages and delete actions.
-                continue;
-                break;
-            }
-
-            PoolItem pi( *it );
-            if ( pi->isKind<Package>() || pi->isKind<SrcPackage>() )
-            {
-              ManagedFile localfile;
-              try
-              {
-                localfile = packageCache.get( pi );
-                localfile.resetDispose(); // keep the package file in the cache
-              }
-              catch ( const AbortRequestException & exp )
-              {
-                it->stepStage( sat::Transaction::STEP_ERROR );
-                miss = true;
-                WAR << "commit cache preload aborted by the user" << endl;
-                ZYPP_THROW( TargetAbortedException( ) );
-                break;
-              }
-              catch ( const SkipRequestException & exp )
-              {
-                ZYPP_CAUGHT( exp );
-                it->stepStage( sat::Transaction::STEP_ERROR );
-                miss = true;
-                WAR << "Skipping cache preload package " << pi->asKind<Package>() << " in commit" << endl;
-                continue;
-              }
-              catch ( const Exception & exp )
-              {
-                // bnc #395704: missing catch causes abort.
-                // TODO see if packageCache fails to handle errors correctly.
-                ZYPP_CAUGHT( exp );
-                it->stepStage( sat::Transaction::STEP_ERROR );
-                miss = true;
-                INT << "Unexpected Error: Skipping cache preload package " << pi->asKind<Package>() << " in commit" << endl;
-                continue;
-              }
-            }
-          }
-          packageCache.preloaded( true ); // try to avoid duplicate infoInCache CBs in commit
+          miss = !packageCache.preloadForTransaction( steps );
         }
 
-        if ( miss )
-        {
+        if ( miss ) {
           ERR << "Some packages could not be provided. Aborting commit."<< endl;
         }
         else
@@ -1516,7 +1462,7 @@ namespace zypp
         }
       }
 
-      {
+  {
         // NOTE: Removing rpm in a transaction, rpm removes the /var/lib/rpm compat symlink.
         // We re-create it, in case it was lost to prevent legacy tools from accidentally
         // assuming no database is present.

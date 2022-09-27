@@ -789,6 +789,15 @@ namespace zyppng {
     return _attachedMediaInfos.back();
   }
 
+  AttachedMediaInfo *ProvidePrivate::findMediumForHandle ( const ProvideMediaHandle &handle )
+  {
+    const auto i = std::find_if( _attachedMediaInfos.begin(), _attachedMediaInfos.end(), [&]( const auto &info ){ return info._name == handle.handle();} );
+    if ( i == _attachedMediaInfos.end() ) {
+      return nullptr;
+    }
+    return &(*i);
+  }
+
   bool ProvidePrivate::queueRequest ( ProvideRequestRef req )
   {
     const auto &schemeName = effectiveScheme( req->url().getScheme() );
@@ -1051,8 +1060,8 @@ namespace zyppng {
   AsyncOpRef< expected<ProvideRes> > Provide::provide( const MediaHandle &attachHandle, const zypp::Pathname &fileName, const ProvideFileSpec &request )
   {
     Z_D();
-    const auto i = std::find_if( d->_attachedMediaInfos.begin(), d->_attachedMediaInfos.end(), [&]( const auto &info ){ return info._name == attachHandle.handle();} );
-    if ( i == d->_attachedMediaInfos.end() ) {
+    const auto i = d->findMediumForHandle( attachHandle );
+    if ( !i ) {
       return makeReadyResult( expected<ProvideRes>::error( ZYPP_EXCPT_PTR( zypp::media::MediaException("Invalid attach handle")) ) );
     }
 
@@ -1077,6 +1086,36 @@ namespace zyppng {
 
     d->queueItem (op);
     return op->promise();
+  }
+
+  AsyncOpRef<expected<zypp::ManagedFile>> Provide::provideToDestination(  const MediaHandle &attachHandle, const zypp::Pathname &fileName, const ProvideFileSpec &request )
+  {
+    Z_D();
+    using namespace zyppng::operators;
+
+    if ( request.destFilenameHint().empty() )
+      return makeReadyResult( expected<zypp::ManagedFile>::error(ZYPP_EXCPT_PTR( zypp::Exception("Setting a destFilenameHint is required for provideToDestination to work correctly"))) );
+
+    const auto i = d->findMediumForHandle( attachHandle );
+    if ( !i ) {
+      return makeReadyResult( expected<zypp::ManagedFile>::error( ZYPP_EXCPT_PTR( zypp::media::MediaException("Invalid attach handle")) ) );
+    }
+
+    const auto &destDir = request.destFilenameHint().dirname();
+    if ( zypp::filesystem::assert_dir( destDir ) ) {
+      auto url = i->_attachedUrl;
+      url.appendPathName( fileName );
+      DBG << "assert_dir " << destDir << " failed" << std::endl;
+      return makeReadyResult( expected<zypp::ManagedFile>::error( ZYPP_EXCPT_PTR( zypp::media::MediaSystemException( url, "System error on " + destDir.asString()) ) ) );
+    }
+
+    return provide( attachHandle, fileName, request )
+      | mbind( [ this, destination=request.destFilenameHint() ]( ProvideRes &&result ){
+          if ( result.file() != destination ) {
+            return copyFile( result.file(), destination ) | mbind( [ result ]( zypp::ManagedFile &&res ) { return zyppng::expected<zypp::ManagedFile>::success(res); } );
+          }
+          return makeReadyResult( zyppng::expected<zypp::ManagedFile>::success( result.asManagedFile() ) );
+        });
   }
 
   AsyncOpRef<expected<std::string>> Provide::checksumForFile ( const zypp::Pathname &p, const std::string &algorithm  )

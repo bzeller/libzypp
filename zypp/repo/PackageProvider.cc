@@ -33,6 +33,9 @@
 #include <zypp/FileChecker.h>
 #include <zypp/target/rpm/RpmHeader.h>
 
+#include <zypp-media/ng/Provide>
+#include <zypp-media/ng/ProvideSpec>
+
 using std::endl;
 
 ///////////////////////////////////////////////////////////////////
@@ -700,6 +703,142 @@ namespace zypp
 
     bool PackageProvider::isCached() const
     { return _pimpl->isCached(); }
+
+
+    AsyncPackageProviderRef AsyncPackageProvider::provide( zyppng::ProvideRef provider, const PackageProviderPolicy & policy_r) {
+
+    }
+
+    AsyncPackageProviderRef AsyncPackageProvider::provide( zyppng::ProvideRef provider, const DeltaCandidates & deltas, const PackageProviderPolicy & policy_r) {
+
+    }
+
+
+    zyppng::AsyncOpRef<zyppng::expected<ManagedFile>> AsyncPackageProvider::tryDelta ( packagedelta::DeltaRpm &&delta_r )
+    {
+      using zyppng::operators::operator|;
+      using zyppng::operators::mbind;
+
+      auto package = std::get<Package::constPtr>( _package );
+
+       if ( delta_r.baseversion().edition() != Edition::noedition
+           && ! _policy.queryInstalled( package->name(), delta_r.baseversion().edition(), package->arch() ) )
+        return zyppng::makeReadyResult( zyppng::expected<ManagedFile>::success(ManagedFile()) );
+
+      if ( ! applydeltarpm::quickcheck( delta_r.baseversion().sequenceinfo() ) )
+        return zyppng::makeReadyResult( zyppng::expected<ManagedFile>::success(ManagedFile()) );
+
+      const auto &repoInfo  = delta_r.repository().info();
+      const auto &allUrls   = repoInfo.baseUrls();
+
+      const auto &mediaLocation = OnMediaLocation(delta_r.location()).prependPath( repoInfo.path() );
+      const auto filePath = mediaLocation.filename();
+      const auto fileSpec = zyppng::ProvideFileSpec( mediaLocation );
+
+      auto spec = zyppng::ProvideMediaSpec( repoInfo.name() );
+      zypp::Pathname mediafile = repoInfo.metadataPath();
+      if ( !mediafile.empty() ) {
+        mediafile += "/media.1/media";
+        if ( zypp::PathInfo(mediafile).isExist() ) {
+          spec.setMediaFile( mediafile );
+          spec.setMedianr( delta_r.location().medianr() );
+        }
+      }
+
+      auto resObj = _provider->attachMedia( std::vector<zypp::Url>( allUrls.begin(), allUrls.end() ), spec )
+      | mbind( [filePath, fileSpec, this ] ( zyppng::ProvideMediaHandle &&hdl ) {
+          return _provider->provide( hdl, filePath, fileSpec );
+        })
+      | mbind( [ this, delta_r, package ]( zyppng::ProvideRes &&res ) {
+
+          // @TODO move this into a worker application, there is no real reason we should block the ev loop for that
+
+          // Build the package
+          Pathname cachedest( package->repoInfo().packagesPath() / package->repoInfo().path() / package->location().filename() );
+          Pathname builddest( cachedest.extend( ".drpm" ) );
+
+          if ( ! applydeltarpm::provide( res.asManagedFile(), builddest, bind( &AsyncPackageProvider::applyDeltaProgress, this, _1 ) ) ) {
+            return zyppng::expected<ManagedFile>::success( ManagedFile() );
+          }
+          return zyppng::expected<ManagedFile>::success( ManagedFile ( builddest, filesystem::unlink ) );
+        })
+      | mbind( [this]( ManagedFile &&file ) {
+          if ( file->empty() )
+            return zyppng::expected<ManagedFile>::success( file );
+
+          // seems we managed to build a rpm file out of the delta, lets check if we got something valid
+
+
+        })
+      ;
+
+      return zyppng::makeReadyResult( zyppng::expected<ManagedFile>::success(ManagedFile()) );
+    }
+
+    void AsyncPackageProvider::applyDeltaProgress ( unsigned progress )
+    {
+      DBG << "Delta progress for " << _pi << " at " << progress << std::endl;
+    }
+
+    zyppng::AsyncOpRef<zyppng::expected<ManagedFile>> AsyncPackageProvider::tryDeltas ( std::list<zypp::packagedelta::DeltaRpm> &&items )
+    {
+      using zyppng::operators::operator|;
+
+      if ( !items.size() ) {
+        return zyppng::makeReadyResult( zyppng::expected<ManagedFile>::success(ManagedFile()) );
+      }
+
+      auto delta = items.front();
+      items.pop_front();
+
+      return std::move(delta)
+      | std::bind( &AsyncPackageProvider::tryDelta, this, std::placeholders::_1 )
+      | [ items = std::move(items), this ] ( zyppng::expected<ManagedFile> &&file ) mutable -> zyppng::AsyncOpRef<zyppng::expected<ManagedFile>> {
+        if ( file && (*file)->empty() )
+          return tryDeltas( std::move(items) );
+        return zyppng::makeReadyResult( std::move(file) );
+      };
+    }
+
+    void AsyncPackageProvider::operator() ( PoolItem &&pi_r )
+    {
+      using zyppng::operators::operator|;
+
+      _pi = pi_r;
+
+      if ( pi_r.isKind<Package>() ) {
+        _package = pi_r->asKind<Package>();
+      } else if ( pi_r.isKind<SrcPackage>() ) {
+        _package = pi_r->asKind<SrcPackage>();
+      } else {
+        setReady( value_type::error( ZYPP_EXCPT_PTR( Exception( str::Str() << "Don't know how to provide non-package " << pi_r.asUserString() ) ) ) );
+        return;
+      }
+
+      // helper that returns either a error or a ManagedFile, a empty ManagedFile means there was no Delta to apply
+      const auto &maybeDelta = [&](){
+
+        // deltas are only possible with real packages
+        if ( !std::holds_alternative<Package::constPtr>(_package) )
+          return zyppng::makeReadyResult( zyppng::expected<ManagedFile>::success(ManagedFile()) );
+
+        auto &package = std::get<Package::constPtr>( _package );
+        if ( ZConfig::instance().download_use_deltarpm()
+          && ( package->repoInfo().url().schemeIsDownloading() || ZConfig::instance().download_use_deltarpm_always() ) ) {
+
+          auto deltaRpms  = _deltas.deltaRpms( package );
+          if ( ! deltaRpms.empty() && _policy.queryInstalled( package->name(), Edition(), package->arch() ) && applydeltarpm::haveApplydeltarpm() ) {
+            return tryDeltas( std::move(deltaRpms) );
+          }
+
+          return zyppng::makeReadyResult( zyppng::expected<ManagedFile>::success(ManagedFile()) );
+        }
+      };
+
+      _pipeline = maybeDelta() | []( zyppng::expected<ManagedFile> &&res ) -> zyppng::AsyncOpRef<zyppng::expected<ManagedFile>> {
+
+      };
+    }
 
   } // namespace repo
   ///////////////////////////////////////////////////////////////////

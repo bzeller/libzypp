@@ -20,10 +20,11 @@ namespace zyppng {
 
 namespace detail {
 
-  template < class AsyncOp,
+  template < template< class, class... > class Container,
+    class AsyncOp,
     class InnerResult = typename AsyncOp::value_type
     >
-  struct WaitForImpl : public zyppng::AsyncOp< std::vector<InnerResult> > {
+  struct WaitForImpl : public zyppng::AsyncOp< Container<InnerResult> > {
 
     WaitForImpl () = default;
 
@@ -33,7 +34,8 @@ namespace detail {
     WaitForImpl& operator= ( WaitForImpl &&other ) = default;
     WaitForImpl ( WaitForImpl &&other ) = default;
 
-    void operator()( std::vector< std::shared_ptr< AsyncOp > > &&ops ) {
+    template < typename ...CArgs >
+    void operator()( Container< std::shared_ptr< AsyncOp >, CArgs... > &&ops ) {
       assert( _allOps.empty() );
 
       if ( ops.empty () ) {
@@ -61,8 +63,8 @@ namespace detail {
       }
     }
 
-    std::vector< std::shared_ptr<zyppng::AsyncOp<InnerResult>> > _allOps;
-    std::vector< InnerResult > _allResults;
+    Container< std::shared_ptr<zyppng::AsyncOp<InnerResult>> > _allOps;
+    Container< InnerResult > _allResults;
   };
 
 }
@@ -71,9 +73,9 @@ namespace detail {
  *  Returns a async operation that waits for all async operations that are passed to it and collects their results,
  *  forwarding them as one
  */
-template < class Res >
+template < class Res , template< class, class... > class Container = std::vector >
 auto waitFor ( ) {
-  return std::make_shared<detail::WaitForImpl<zyppng::AsyncOp<Res>>>();
+  return std::make_shared<detail::WaitForImpl<Container, zyppng::AsyncOp<Res>>>();
 }
 
 }

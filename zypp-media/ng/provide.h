@@ -115,7 +115,14 @@ namespace zyppng {
 
     AsyncOpRef<expected<ProvideRes>> provide(  const std::vector<zypp::Url> &urls, const ProvideFileSpec &request );
     AsyncOpRef<expected<ProvideRes>> provide(  const zypp::Url &url, const ProvideFileSpec &request );
+
     AsyncOpRef<expected<ProvideRes>> provide(  const MediaHandle &attachHandle, const zypp::Pathname &fileName, const ProvideFileSpec &request );
+
+    /*!
+     * Provides the file via media handlers and makes sure it is put into the location the destination file hint in the \ref ProvideFileSpec specifies.
+     * Not initializing the hint will result in a error
+     */
+    AsyncOpRef<expected<zypp::ManagedFile>> provideToDestination(  const MediaHandle &attachHandle, const zypp::Pathname &fileName, const ProvideFileSpec &request );
 
     /*!
      * Schedules a job to calculate the checksum for the given file

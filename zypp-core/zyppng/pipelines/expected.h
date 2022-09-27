@@ -22,7 +22,7 @@
 namespace zyppng {
 
   template<typename T, typename E = std::exception_ptr>
-  class expected {
+  class [[nodiscard]] expected {
   protected:
       union {
           T m_value;
@@ -201,7 +201,7 @@ namespace zyppng {
 
 
   template<typename E>
-  class expected<void, E> {
+  class [[nodiscard]] expected<void, E> {
   private:
       union {
           void* m_value;
@@ -333,6 +333,15 @@ namespace zyppng {
     return expected<Type,Err>::success( std::forward<Type>(t) );
   }
 
+  template <typename T>
+  T get_or_throw ( const expected<T, std::exception_ptr> &exp )
+  {
+    if ( exp )
+      return exp.get();
+    else
+      std::rethrow_exception( exp.error() );
+  }
+
   namespace detail {
 
     // helper to figure out the return type for a mbind callback, if the ArgType is void the callback is considered to take no argument.
@@ -349,7 +358,7 @@ namespace zyppng {
            , typename Function
            , typename ResultType = detail::mbind_cb_result_t<Function, T>
            >
-  std::enable_if_t< !detail::is_async_op< remove_smart_ptr_t<ResultType> >::value, ResultType> mbind( const expected<T, E>& exp, Function f)
+  ResultType mbind( const expected<T, E>& exp, Function f)
   {
       if (exp) {
         if constexpr ( std::is_same_v<T,void> )
@@ -357,7 +366,10 @@ namespace zyppng {
         else
           return std::invoke( f, exp.get() );
       } else {
+        if constexpr( !detail::is_async_op< remove_smart_ptr_t<ResultType> >::value )
           return ResultType::error(exp.error());
+        else
+          return makeReadyResult( remove_smart_ptr_t<ResultType>::value_type::error(exp.error()) );
       }
   }
 
@@ -366,7 +378,7 @@ namespace zyppng {
     , typename Function
     , typename ResultType = detail::mbind_cb_result_t<Function, T>
     >
-  std::enable_if_t< !detail::is_async_op< remove_smart_ptr_t<ResultType> >::value, ResultType> mbind( expected<T, E>&& exp, Function f)
+  ResultType mbind( expected<T, E>&& exp, Function f)
   {
     if (exp) {
       if constexpr ( std::is_same_v<T,void> )
@@ -374,33 +386,38 @@ namespace zyppng {
       else
         return std::invoke( f, std::move(exp.get()) );
     } else {
-      return ResultType::error( std::move(exp.error()) );
-    }
-  }
-
-  template < typename T
-    , typename E
-    , typename Function
-    , typename ResultType = detail::mbind_cb_result_t<Function, T>
-    >
-  std::enable_if_t< detail::is_async_op< remove_smart_ptr_t<ResultType> >::value, ResultType> mbind( const expected<T, E>& exp, Function f)
-  {
-    if (exp) {
-      if constexpr ( std::is_same_v<T,void> )
-        return std::invoke( f );
+      if constexpr( !detail::is_async_op< remove_smart_ptr_t<ResultType> >::value )
+        return ResultType::error( std::move(exp.error()) );
       else
-        return std::invoke( f, exp.get() );
-    } else {
-      return  makeReadyResult( remove_smart_ptr_t<ResultType>::value_type::error(exp.error()) );
+        return  makeReadyResult( remove_smart_ptr_t<ResultType>::value_type::error( std::move(exp.error()) ) );
     }
+  }
+
+  template < typename T
+           , typename E
+           , typename Function
+           , typename ElseFunction
+           , typename ResultType = detail::mbind_cb_result_t<Function, T>
+           >
+  ResultType mbind_or_else( const expected<T, E>& exp, Function f, ElseFunction orElse )
+  {
+      if (exp) {
+        if constexpr ( std::is_same_v<T,void> )
+          return std::invoke( f );
+        else
+          return std::invoke( f, exp.get() );
+      } else {
+          return std::invoke( orElse, exp.error() );
+      }
   }
 
   template < typename T
     , typename E
     , typename Function
+    , typename ElseFunction
     , typename ResultType = detail::mbind_cb_result_t<Function, T>
     >
-  std::enable_if_t< detail::is_async_op< remove_smart_ptr_t<ResultType> >::value, ResultType> mbind( expected<T, E>&& exp, Function f)
+  ResultType mbind_or_else( expected<T, E>&& exp, Function f, ElseFunction orElse )
   {
     if (exp) {
       if constexpr ( std::is_same_v<T,void> )
@@ -408,7 +425,7 @@ namespace zyppng {
       else
         return std::invoke( f, std::move(exp.get()) );
     } else {
-      return  makeReadyResult( remove_smart_ptr_t<ResultType>::value_type::error( std::move(exp.error()) ) );
+        return std::invoke( orElse, std::move(exp.error() ) );
     }
   }
 
@@ -429,6 +446,25 @@ namespace zyppng {
         return mbind( std::move(exp), function );
       }
     };
+
+    template < typename Callback, typename CallbackOrElse >
+    struct mbind_or_else_helper {
+      Callback function;
+      CallbackOrElse orElseFun;
+
+      template< typename T
+        , typename E >
+      auto operator()( const expected<T, E>& exp ) {
+        return mbind_or_else( exp, function, orElseFun );
+      }
+
+      template< typename T
+        , typename E >
+      auto operator()( expected<T, E>&& exp ) {
+        return mbind_or_else( std::move(exp), function, orElseFun );
+      }
+    };
+
   }
 
   namespace operators {
@@ -438,8 +474,15 @@ namespace zyppng {
         std::forward<Fun>(function)
       };
     }
+
+    template <typename Fun, typename FunOrElse >
+    auto mbind_or_else ( Fun && function, FunOrElse &&orElseFun ) {
+      return detail::mbind_or_else_helper<Fun, FunOrElse> {
+        std::forward<Fun>(function),
+        std::forward<FunOrElse>(orElseFun)
+      };
+    }
   }
 }
 
 #endif
-

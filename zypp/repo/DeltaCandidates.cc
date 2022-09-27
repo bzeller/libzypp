@@ -39,6 +39,10 @@ namespace zypp
         : repos(repos), pkgname(pkgname)
         {}
 
+        Impl( std::list<Repository> &&reps, const std::string & pkgname = "" )
+        : repos( std::move(reps) ), pkgname(pkgname)
+        {}
+
         std::list<Repository> repos;
         std::string pkgname;
 
@@ -70,6 +74,11 @@ namespace zypp
     DeltaCandidates::DeltaCandidates(const std::list<Repository> & repos,
                                      const std::string & pkgname)
     : _pimpl( new Impl(repos, pkgname) )
+    {}
+
+    DeltaCandidates::DeltaCandidates(std::list<Repository> &&repos,
+                                     const std::string & pkgname)
+    : _pimpl( new Impl(std::move(repos), pkgname) )
     {}
 
     DeltaCandidates::~DeltaCandidates()

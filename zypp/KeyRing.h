@@ -225,6 +225,11 @@ namespace zypp
     /** Default ctor */
     KeyRing(const Pathname &baseTmpDir);
 
+    /** move ctor */
+    KeyRing( KeyRing &&other );
+
+    KeyRing &operator= ( KeyRing &&other );
+
     /**
      * imports a key from a file.
      * throw if key was not imported

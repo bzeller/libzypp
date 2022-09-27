@@ -1032,8 +1032,6 @@ namespace zyppng {
     // tell others as well
     _sigReady.emit( zyppng::expected<AttachedMediaInfo *>::success(&medium) );
 
-    prom->isReady ();
-
     MIL << "Before setFinished" << std::endl;
     updateState( Finished );
     return;

@@ -13,12 +13,18 @@
 #define ZYPP_REPO_PACKAGEPROVIDER_H
 
 #include <iosfwd>
+#include <variant>
 
 #include <zypp/ZYppCallbacks.h>
 #include <zypp/Package.h>
+#include <zypp/SrcPackage.h>
 #include <zypp/ManagedFile.h>
 #include <zypp/repo/DeltaCandidates.h>
 #include <zypp/repo/RepoProvideFile.h>
+
+#include <zypp-media/ng/ProvideFwd>
+#include <zypp-core/zyppng/pipelines/AsyncResult>
+#include <zypp-core/zyppng/pipelines/Expected>
 
 ///////////////////////////////////////////////////////////////////
 namespace zypp
@@ -99,6 +105,30 @@ namespace zypp
       RW_pointer<Impl> _pimpl; ///< Pointer to implementation.
     };
     ///////////////////////////////////////////////////////////////////
+
+    ZYPP_FWD_DECL_TYPE_WITH_REFS(AsyncPackageProvider);
+
+    class AsyncPackageProvider : public zyppng::AsyncOp<zyppng::expected<ManagedFile>>
+    {
+      public:
+        static AsyncPackageProviderRef provide( zyppng::ProvideRef provider, const PackageProviderPolicy & policy_r = PackageProviderPolicy() );
+        static AsyncPackageProviderRef provide( zyppng::ProvideRef provider, const DeltaCandidates & deltas, const PackageProviderPolicy & policy_r = PackageProviderPolicy() );
+
+        void operator() ( PoolItem &&pi_r ) ;
+
+      private:
+        zyppng::AsyncOpRef<zyppng::expected<ManagedFile>> tryDeltas ( std::list<packagedelta::DeltaRpm> &&items );
+        zyppng::AsyncOpRef<zyppng::expected<ManagedFile>> tryDelta  ( packagedelta::DeltaRpm &&delt );
+        void applyDeltaProgress ( unsigned progress );
+
+      private:
+        zyppng::AsyncOpRef<zyppng::expected<ManagedFile>> _pipeline; //< the internal pipeline of our monad
+        zyppng::ProvideRef _provider;
+        PoolItem _pi;
+        std::variant<std::monostate, Package::constPtr, SrcPackage::constPtr> _package;
+        DeltaCandidates  _deltas;
+        PackageProviderPolicy _policy;
+    };
 
   } // namespace repo
   ///////////////////////////////////////////////////////////////////
