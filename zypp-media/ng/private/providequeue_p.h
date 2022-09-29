@@ -39,6 +39,11 @@ namespace zyppng {
 
     using TimePoint = std::chrono::time_point<std::chrono::steady_clock>;
 
+    enum SchedulePolicy {
+      Now,
+      AfterNextDetach
+    };
+
     struct Item {
 
       enum State {
@@ -48,18 +53,20 @@ namespace zyppng {
         Cancelling,
         Finished
       };
+
       State _state = Pending;
       bool isAttachRequest () const;
       bool isFileRequest () const;
       bool isDetachRequest() const;
 
       ProvideRequestRef _request;
+      SchedulePolicy _schedPolicy = Now;
     };
 
     ProvideQueue( ProvidePrivate &parent );
     ~ProvideQueue();
     bool startup ( const std::string &workerScheme, const zypp::Pathname &workDir, const std::string &hostname = "" );
-    void enqueue ( ProvideRequestRef request );
+    void enqueue ( ProvideRequestRef request, const SchedulePolicy policy = SchedulePolicy::Now );
     void cancel  ( ProvideRequest *item, std::exception_ptr error );
     void detach  ( const std::string &id );
     void scheduleNext ();

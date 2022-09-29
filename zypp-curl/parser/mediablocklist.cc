@@ -552,4 +552,3 @@ MediaBlockList::asString() const
 
   } // namespace media
 } // namespace zypp
-

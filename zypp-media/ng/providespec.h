@@ -63,6 +63,16 @@ namespace zyppng
     ProvideMediaSpec &setMediaFile( const zypp::Pathname &pName );
 
     /*!
+     * Specifies if the request should fail if the media handler is jammed, default is false
+     */
+    bool failOnJammed () const;
+
+    /*!
+     * If set to \a true the request will fail if the media handler is jammed
+     */
+    ProvideMediaSpec &setFailOnJammed ( const bool set = true );
+
+    /*!
      * Returns a map of custom key->value pairs that can control special aspects
      * of how all files are provided by the medium after it was attached
      */
@@ -116,15 +126,6 @@ namespace zyppng
 
     bool checkExistsOnly () const;
     ProvideFileSpec & setCheckExistsOnly( const bool set = true );
-
-
-    /** Whether this is an optional resource.
-     * This is a hint to the downloader not to report an error if
-     * the resource is not present on the server.
-     */
-    bool optional() const;
-    /** Set whether the resource is \ref optional. */
-    ProvideFileSpec & setOptional( bool val );
 
     /** The size of the resource on the server. */
     const zypp::ByteCount &downloadSize() const;

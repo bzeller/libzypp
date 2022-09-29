@@ -254,7 +254,7 @@ zyppng::worker::AttachResult DiscProvider::mountDevice ( const uint32_t id, cons
 
     // we did go through all devices, but didn't find any.
     if ( devicesTested == 0 ) {
-      // no devices are free
+      // all devices are mounted by us
       return zyppng::worker::AttachResult::error(
         zyppng::ProvideMessage::Code::Jammed
         , "No free ressources available"
@@ -263,13 +263,23 @@ zyppng::worker::AttachResult DiscProvider::mountDevice ( const uint32_t id, cons
     } else {
 
       const auto &mountedDevs = zypp::media::Mount::getEntries();
+
+      // how many devices we looked at were mounted by us
+      uint devicesMountedByUs = 0;
+
       // k, we need to ask the user to give us the medium we need
       // first find the devices that are free
       std::vector<std::string> freeDevs;
       for( const auto &dev : possibleDevs ) {
-        if ( !dev->_mountPoint.empty() )
+        if ( !dev->_mountPoint.empty() ) {
+          devicesMountedByUs++;
           continue;
+        }
 
+        // we are checking here if the devices are mounted by something else than zypp.
+        // This means that we need to fail the mount in case all possible devices are mounted by something else
+        // another approach could be to give the user a list of devices that are simply not used by us and then
+        // the user can decide if there is a mount that can be released and the device given to zypp.
         auto i = std::find_if( mountedDevs.begin (), mountedDevs.end(), [&dev]( const zypp::media::MountEntry &e ) {
           zypp::PathInfo pi( e.src );
           return ( pi.isBlk() && pi.devMajor() == dev->_maj_nr && pi.devMinor() == dev->_min_nr );
@@ -281,8 +291,20 @@ zyppng::worker::AttachResult DiscProvider::mountDevice ( const uint32_t id, cons
         }
       }
 
-      // if there are no devices free, we are jammed
+      // if there are no devices free we are jammed
       if ( freeDevs.empty() ) {
+
+        // if no devices are mounted by us, we need to fail the mount
+        // because the devices are either mounted by something else or the
+        // mountpoints are stuck
+        if ( devicesMountedByUs == 0 ) {
+          return zyppng::worker::AttachResult::error (
+            zyppng::ProvideMessage::Code::MountFailed
+            , "All available devices are mounted by something else than zypp"
+            , false
+          );
+        }
+
         return zyppng::worker::AttachResult::error(
           zyppng::ProvideMessage::Code::Jammed
           , "No free ressources available"

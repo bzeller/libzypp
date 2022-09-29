@@ -209,23 +209,24 @@ namespace zyppng {
 
         zypp::Url newUrl( msg.value( RedirectMsgFields::NewUrl ).asString() );
         if ( !safeRedirectTo( finishedReq, newUrl ) ) {
-          cancelWithError( ZYPP_EXCPT_PTR ( zypp::media::MediaException("Redirect Loop")) );
-          return;
+          ZYPP_THROW( zypp::media::MediaException("Redirect Loop") );
         }
 
         MIL << "Request redirected to: " << newUrl << std::endl;
-
         if ( log ) log->requestRedirect( *this, msg.requestId(), newUrl );
 
         finishedReq->setUrl( newUrl );
 
         if ( !enqueueRequest( finishedReq ) ) {
-          cancelWithError( ZYPP_EXCPT_PTR(zypp::media::MediaException("Failed to queue request")) );
+          ZYPP_THROW( zypp::media::MediaException("Failed to queue request") );
         }
       }  catch ( ... ) {
-        cancelWithError( std::current_exception() );
+        auto excpt = std::current_exception();
+        if ( log ) log->requestFailed( *this, finishedReq->provideMessage().requestId(), excpt );
+        cancelWithError( excpt );
         return;
       }
+
       return;
 
     } else if ( code == ProvideMessage::Code::Metalink ) {
@@ -235,40 +236,44 @@ namespace zyppng {
 
       MIL << "Request finished with mirrorlist from server." << std::endl;
 
-      //@TODO do we need to merge this with the mirrorlist we got from the user?
-      //      or does a mirrorlist from d.o.o invalidate that?
-
-      std::vector<zypp::Url> urls;
-      const auto &mirrors = msg.values( MetalinkRedirectMsgFields::NewUrl );
-      for( auto i = mirrors.cbegin(); i != mirrors.cend(); i++ ) {
-        try {
-          zypp::Url newUrl( i->asString() );
-          if ( !canRedirectTo( finishedReq, newUrl ) )
-            continue;
-          urls.push_back ( newUrl );
-        }  catch ( ... ) {
-          if ( i->isString() )
-            WAR << "Received invalid URL from worker: " << i->asString() << " ignoring!" << std::endl;
-          else
-            WAR << "Received invalid value for newUrl from worker ignoring!" << std::endl;
-        }
-      }
-
-      if ( urls.size () == 0 ) {
-        cancelWithError( ZYPP_EXCPT_PTR ( zypp::media::MediaException("No mirrors left to redirect to.")) );
-        return;
-      }
-
-      MIL << "Found usable nr of mirrors: " << urls.size () << std::endl;
-      finishedReq->setUrls( urls );
-
-      // disable metalink
-      finishedReq->provideMessage().setValue( ProvideMsgFields::MetalinkEnabled, false );
-
       if ( log ) log->requestDone( *this, msg.requestId() );
 
-      if ( !enqueueRequest( finishedReq ) ) {
-        cancelWithError( ZYPP_EXCPT_PTR(zypp::media::MediaException("Failed to queue request")) );
+      try {
+        //@TODO do we need to merge this with the mirrorlist we got from the user?
+        //      or does a mirrorlist from d.o.o invalidate that?
+        std::vector<zypp::Url> urls;
+        const auto &mirrors = msg.values( MetalinkRedirectMsgFields::NewUrl );
+        for( auto i = mirrors.cbegin(); i != mirrors.cend(); i++ ) {
+          try {
+            zypp::Url newUrl( i->asString() );
+            if ( !canRedirectTo( finishedReq, newUrl ) )
+              continue;
+            urls.push_back ( newUrl );
+          }  catch ( ... ) {
+            if ( i->isString() )
+              WAR << "Received invalid URL from worker: " << i->asString() << " ignoring!" << std::endl;
+            else
+              WAR << "Received invalid value for newUrl from worker ignoring!" << std::endl;
+          }
+        }
+
+        if ( urls.size () == 0 ) {
+          ZYPP_THROW ( zypp::media::MediaException("No mirrors left to redirect to."));
+        }
+
+        MIL << "Found usable nr of mirrors: " << urls.size () << std::endl;
+        finishedReq->setUrls( urls );
+
+        // disable metalink
+        finishedReq->provideMessage().setValue( ProvideMsgFields::MetalinkEnabled, false );
+
+        if ( !enqueueRequest( finishedReq ) ) {
+          ZYPP_THROW(zypp::media::MediaException("Failed to queue request"));
+        }
+      } catch ( ... ) {
+        auto excpt = std::current_exception();
+        cancelWithError( excpt );
+        return;
       }
 
       MIL << "End of mirrorlist handling"<< std::endl;
@@ -279,96 +284,9 @@ namespace zyppng {
       // remove the old request
       _runningReq.reset();
 
-      std::exception_ptr errPtr;
-      try {
-        const auto reqUrl = finishedReq->activeUrl().value();
-        const auto reason  = msg.value( ErrMsgFields::Reason ).asString();
-        switch ( code ) {
-          case ProvideMessage::Code::BadRequest:
-            errPtr = ZYPP_EXCPT_PTR( zypp::media::MediaException (zypp::str::Str() << "Bad request for URL: " << reqUrl << " " << reason ) );
-            break;
-          case ProvideMessage::Code::PeerCertificateInvalid:
-            errPtr = ZYPP_EXCPT_PTR( zypp::media::MediaException(zypp::str::Str() << "PeerCertificateInvalid Error for URL: " << reqUrl << " " << reason) );
-            break;
-          case ProvideMessage::Code::ConnectionFailed:
-            errPtr = ZYPP_EXCPT_PTR( zypp::media::MediaException(zypp::str::Str() << "ConnectionFailed Error for URL: " << reqUrl << " " << reason ) );
-            break;
-          case ProvideMessage::Code::ExpectedSizeExceeded: {
-
-            std::optional<int64_t> filesize;
-            finishedReq->provideMessage ().forEachVal( [&]( const std::string &key, const auto &val ){
-              if ( key == ProvideMsgFields::ExpectedFilesize && val.valid() )
-                filesize = val.asInt64();
-              return true;
-            });
-
-            if ( !filesize ) {
-              errPtr = ZYPP_EXCPT_PTR( zypp::media::MediaException( zypp::str::Str() << "ExceededExpectedSize Error for URL: " << reqUrl << " " << reason ) );
-            } else {
-              errPtr = ZYPP_EXCPT_PTR( zypp::media::MediaFileSizeExceededException(reqUrl, *filesize ) );
-            }
-            break;
-          }
-          case ProvideMessage::Code::Cancelled:
-            errPtr = ZYPP_EXCPT_PTR( zypp::media::MediaException( zypp::str::Str() << "Request was cancelled: " << reqUrl << " " << reason ) );
-            break;
-          case ProvideMessage::Code::InvalidChecksum:
-            errPtr = ZYPP_EXCPT_PTR( zypp::media::MediaException( zypp::str::Str() << "InvalidChecksum Error for URL: " << reqUrl << " " << reason ) );
-            break;
-          case ProvideMessage::Code::Timeout:
-            errPtr = ZYPP_EXCPT_PTR( zypp::media::MediaTimeoutException(reqUrl) );
-            break;
-          case ProvideMessage::Code::NotFound:
-            errPtr = ZYPP_EXCPT_PTR( zypp::media::MediaFileNotFoundException(reqUrl, "") );
-            break;
-          case ProvideMessage::Code::Forbidden:
-          case ProvideMessage::Code::Unauthorized: {
-
-            const auto &hintVal = msg.value( "authHint"sv );
-            std::string hint;
-            if ( hintVal.valid() && hintVal.isString() ) {
-              hint = hintVal.asString();
-            }
-
-            //@TODO retry here with timestamp from cred store check
-            // we let the request fail after it checked the store
-
-            errPtr = ZYPP_EXCPT_PTR ( zypp::media::MediaUnauthorizedException(
-              reqUrl, reason, "", hint
-              ));
-            break;
-
-          }
-          case ProvideMessage::Code::MountFailed:
-            errPtr = ZYPP_EXCPT_PTR( zypp::media::MediaException( zypp::str::Str() << "MountFailed Error for URL: " << reqUrl << " " << reason ) );
-            break;
-          case ProvideMessage::Code::Jammed:
-            errPtr = ZYPP_EXCPT_PTR( zypp::media::MediaJammedException() );
-            break;
-          case ProvideMessage::Code::MediaChangeSkip:
-            errPtr = ZYPP_EXCPT_PTR( zypp::SkipRequestException ( zypp::str::Str() << "User-requested skipping for URL: " << reqUrl << " " << reason ) );
-            break;
-          case ProvideMessage::Code::MediaChangeAbort:
-            errPtr = ZYPP_EXCPT_PTR( zypp::AbortRequestException( zypp::str::Str() <<"Aborting requested by user for URL: " << reqUrl << " " << reason ) );
-            break;
-          case ProvideMessage::Code::InternalError:
-            errPtr = ZYPP_EXCPT_PTR( zypp::media::MediaException( zypp::str::Str() << "WorkerSpecific Error for URL: " << reqUrl << " " << reason ) );
-            break;
-          case ProvideMessage::Code::NotAFile:
-            errPtr = ZYPP_EXCPT_PTR( zypp::media::MediaNotAFileException(reqUrl, "") );
-            break;
-          case ProvideMessage::Code::MediumNotDesired:
-            errPtr = ZYPP_EXCPT_PTR( zypp::media::MediaNotDesiredException(reqUrl) );
-            break;
-          default:
-            errPtr = ZYPP_EXCPT_PTR( zypp::media::MediaException( zypp::str::Str() << "Unknown Error for URL: " << reqUrl << " " << reason ) );
-            break;
-        }
-      } catch (...) {
-        errPtr = ZYPP_EXCPT_PTR( zypp::media::MediaException( zypp::str::Str() << "Invalid error message received for URL: " << *finishedReq->activeUrl() << " code: " << code ) );
-      }
-
+      auto errPtr = makeRequestError( *finishedReq, msg );
       if ( log ) log->requestFailed( *this, msg.requestId(), errPtr );
+
       // finish the request
       cancelWithError( errPtr );
       return;
@@ -481,6 +399,103 @@ namespace zyppng {
       // CAREFUL, 'this' might be invalid from here on
     }
   }
+
+  std::exception_ptr ProvideItem::makeRequestError ( const ProvideRequest &finishedReq, const ProvideMessage &msg ) const
+  {
+    std::exception_ptr errPtr;
+
+    const auto code = msg.code();
+    const auto reqUrl = finishedReq.activeUrl().value();
+
+    try {
+      const auto reason = msg.value( ErrMsgFields::Reason ).asString();
+      switch ( code ) {
+        case ProvideMessage::Code::BadRequest:
+          errPtr = ZYPP_EXCPT_PTR( zypp::media::MediaException (zypp::str::Str() << "Bad request for URL: " << reqUrl << " " << reason ) );
+          break;
+        case ProvideMessage::Code::PeerCertificateInvalid:
+          errPtr = ZYPP_EXCPT_PTR( zypp::media::MediaException(zypp::str::Str() << "PeerCertificateInvalid Error for URL: " << reqUrl << " " << reason) );
+          break;
+        case ProvideMessage::Code::ConnectionFailed:
+          errPtr = ZYPP_EXCPT_PTR( zypp::media::MediaException(zypp::str::Str() << "ConnectionFailed Error for URL: " << reqUrl << " " << reason ) );
+          break;
+        case ProvideMessage::Code::ExpectedSizeExceeded: {
+
+          std::optional<int64_t> filesize;
+          finishedReq.provideMessage ().forEachVal( [&]( const std::string &key, const auto &val ){
+            if ( key == ProvideMsgFields::ExpectedFilesize && val.valid() )
+              filesize = val.asInt64();
+            return true;
+          });
+
+          if ( !filesize ) {
+            errPtr = ZYPP_EXCPT_PTR( zypp::media::MediaException( zypp::str::Str() << "ExceededExpectedSize Error for URL: " << reqUrl << " " << reason ) );
+          } else {
+            errPtr = ZYPP_EXCPT_PTR( zypp::media::MediaFileSizeExceededException(reqUrl, *filesize ) );
+          }
+          break;
+        }
+        case ProvideMessage::Code::Cancelled:
+          errPtr = ZYPP_EXCPT_PTR( zypp::media::MediaException( zypp::str::Str() << "Request was cancelled: " << reqUrl << " " << reason ) );
+          break;
+        case ProvideMessage::Code::InvalidChecksum:
+          errPtr = ZYPP_EXCPT_PTR( zypp::media::MediaException( zypp::str::Str() << "InvalidChecksum Error for URL: " << reqUrl << " " << reason ) );
+          break;
+        case ProvideMessage::Code::Timeout:
+          errPtr = ZYPP_EXCPT_PTR( zypp::media::MediaTimeoutException(reqUrl) );
+          break;
+        case ProvideMessage::Code::NotFound:
+          errPtr = ZYPP_EXCPT_PTR( zypp::media::MediaFileNotFoundException(reqUrl, "") );
+          break;
+        case ProvideMessage::Code::Forbidden:
+        case ProvideMessage::Code::Unauthorized: {
+
+          const auto &hintVal = msg.value( "authHint"sv );
+          std::string hint;
+          if ( hintVal.valid() && hintVal.isString() ) {
+            hint = hintVal.asString();
+          }
+
+          //@TODO retry here with timestamp from cred store check
+          // we let the request fail after it checked the store
+
+          errPtr = ZYPP_EXCPT_PTR ( zypp::media::MediaUnauthorizedException(
+            reqUrl, reason, "", hint
+            ));
+          break;
+
+        }
+        case ProvideMessage::Code::MountFailed:
+          errPtr = ZYPP_EXCPT_PTR( zypp::media::MediaException( zypp::str::Str() << "MountFailed Error for URL: " << reqUrl << " " << reason ) );
+          break;
+        case ProvideMessage::Code::Jammed:
+          errPtr = ZYPP_EXCPT_PTR( zypp::media::MediaJammedException() );
+          break;
+        case ProvideMessage::Code::MediaChangeSkip:
+          errPtr = ZYPP_EXCPT_PTR( zypp::SkipRequestException ( zypp::str::Str() << "User-requested skipping for URL: " << reqUrl << " " << reason ) );
+          break;
+        case ProvideMessage::Code::MediaChangeAbort:
+          errPtr = ZYPP_EXCPT_PTR( zypp::AbortRequestException( zypp::str::Str() <<"Aborting requested by user for URL: " << reqUrl << " " << reason ) );
+          break;
+        case ProvideMessage::Code::InternalError:
+          errPtr = ZYPP_EXCPT_PTR( zypp::media::MediaException( zypp::str::Str() << "WorkerSpecific Error for URL: " << reqUrl << " " << reason ) );
+          break;
+        case ProvideMessage::Code::NotAFile:
+          errPtr = ZYPP_EXCPT_PTR( zypp::media::MediaNotAFileException(reqUrl, "") );
+          break;
+        case ProvideMessage::Code::MediumNotDesired:
+          errPtr = ZYPP_EXCPT_PTR( zypp::media::MediaNotDesiredException(reqUrl) );
+          break;
+        default:
+          errPtr = ZYPP_EXCPT_PTR( zypp::media::MediaException( zypp::str::Str() << "Unknown Error for URL: " << reqUrl << " " << reason ) );
+          break;
+      }
+    } catch (...) {
+      errPtr = ZYPP_EXCPT_PTR( zypp::media::MediaException( zypp::str::Str() << "Invalid error message received for URL: " << reqUrl << " code: " << code ) );
+    }
+    return errPtr;
+  }
+
 
   void ProvideItem::released()
   {
@@ -683,8 +698,11 @@ namespace zyppng {
               MIL << "CACHE MISS, file " << locFilename << " was already removed, queueing again" << std::endl;
               cacheMiss ( finishedReq );
               finishedReq->clearForRestart();
-              enqueueRequest( finishedReq );
+
+              if ( !enqueueRequest( finishedReq ) )
+                cancelWithError( ZYPP_EXCPT_PTR(zypp::media::MediaException("Failed to queue request")) );
               return;
+
             } else {
               // if we reach here it seems that a new file, that was not in cache before, vanished between
               // providing it and receiving the finished message.
@@ -1110,41 +1128,57 @@ namespace zyppng {
       return;
     }
 
+    auto log = provider().log();
+
     if( _workerType == ProvideQueue::Config::Downloading ) {
       // success
       if ( msg.code() == ProvideMessage::Code::ProvideFinished ) {
 
-        updateState(Finalizing);
-
-        zypp::Url baseUrl = *finishedReq->activeUrl();
-        // remove /media.n/media
-        baseUrl.setPathName( zypp::Pathname(baseUrl.getPathName()).dirname().dirname() );
-
-        // we got the file, lets parse it
-        auto smvDataRemote = MediaDataVerifier::createVerifier("SuseMediaV1");
-        if ( !smvDataRemote ) {
-          return cancelWithError( ZYPP_EXCPT_PTR( zypp::media::MediaException("Unable to verify the medium, no verifier instance was returned.")) );
+        if ( log ) {
+          AnyMap m;
+          m["spec"] = _initialSpec;
+          log->requestDone( *this, msg.requestId(), m );
         }
 
-        if ( !smvDataRemote->load( msg.value( ProvideFinishedMsgFields::LocalFilename ).asString() ) ) {
-          return cancelWithError( ZYPP_EXCPT_PTR( zypp::media::MediaException("Unable to verify the medium, unable to load remote verify data.")) );
-        }
+        try
+        {
+          updateState(Finalizing);
 
-        // check if we got a valid media file
-        if ( !smvDataRemote->valid () ) {
-          return cancelWithError( ZYPP_EXCPT_PTR( zypp::media::MediaException("Unable to verify the medium, unable to load local verify data.")) );
-        }
+          zypp::Url baseUrl = *finishedReq->activeUrl();
+          // remove /media.n/media
+          baseUrl.setPathName( zypp::Pathname(baseUrl.getPathName()).dirname().dirname() );
 
-        // check if the received file matches with the one we have in the spec
-        if (! _verifier->matches( smvDataRemote ) ) {
-          DBG << "expect: " << _verifier      << " medium " << _initialSpec.medianr() << std::endl;
-          DBG << "remote: " << smvDataRemote  << std::endl;
-          return cancelWithError( ZYPP_EXCPT_PTR( zypp::media::MediaNotDesiredException( *finishedReq->activeUrl() ) ) );
-        }
+          // we got the file, lets parse it
+          auto smvDataRemote = MediaDataVerifier::createVerifier("SuseMediaV1");
+          if ( !smvDataRemote ) {
+            ZYPP_THROW( zypp::media::MediaException("Unable to verify the medium, no verifier instance was returned."));
+          }
 
-        // all good, register the medium and tell all child items
-        _runningReq.reset();
-        return finishWithSuccess( provider().addMedium( _workerType, baseUrl, _initialSpec ) );
+          if ( !smvDataRemote->load( msg.value( ProvideFinishedMsgFields::LocalFilename ).asString() ) ) {
+            ZYPP_THROW( zypp::media::MediaException("Unable to verify the medium, unable to load remote verify data."));
+          }
+
+          // check if we got a valid media file
+          if ( !smvDataRemote->valid () ) {
+           ZYPP_THROW( zypp::media::MediaException("Unable to verify the medium, unable to load local verify data."));
+          }
+
+          // check if the received file matches with the one we have in the spec
+          if (! _verifier->matches( smvDataRemote ) ) {
+            DBG << "expect: " << _verifier      << " medium " << _initialSpec.medianr() << std::endl;
+            DBG << "remote: " << smvDataRemote  << std::endl;
+            ZYPP_THROW( zypp::media::MediaNotDesiredException( *finishedReq->activeUrl() ) );
+          }
+
+          // all good, register the medium and tell all child items
+          _runningReq.reset();
+          return finishWithSuccess( provider().addMedium( _workerType, baseUrl, _initialSpec ) );
+
+        } catch( ... ) {
+          auto excpt = std::current_exception();
+          cancelWithError( excpt );
+          return;
+        }
 
       } else if ( msg.code() == ProvideMessage::Code::NotFound ) {
 
@@ -1153,6 +1187,12 @@ namespace zyppng {
         if ( _verifier->totalMedia () == 1 ) {
           // relaxed , tolerate a vanished media file
           _runningReq.reset();
+
+          if ( log ) {
+            AnyMap m;
+            m["spec"] = _initialSpec;
+            log->requestDone( *this, msg.requestId(), m );
+          }
           return finishWithSuccess( provider().addMedium( _workerType, _mirrorList.front(), _initialSpec) );
         } else {
           return ProvideItem::finishReq ( queue, finishedReq, msg );
@@ -1163,12 +1203,35 @@ namespace zyppng {
     } else {
       // real device attach
       if ( msg.code() == ProvideMessage::Code::AttachFinished ) {
+        if ( log ) {
+          AnyMap m;
+          m["spec"] = _initialSpec;
+          log->requestDone( *this, msg.requestId(), m );
+        }
         _runningReq.reset();
         return finishWithSuccess( provider().addMedium( _workerType
           , queue.weak_this<ProvideQueue>()
           , finishedReq->provideMessage().value( AttachMsgFields::AttachId ).asString()
           , *finishedReq->activeUrl()
           , _initialSpec ) );
+
+      } else if ( msg.code() == ProvideMessage::Code::Jammed ) {
+
+        if ( !_initialSpec.failOnJammed() ) {
+          if ( log ) {
+            // request technically failed, lets log it
+            log->requestFailed( *this, msg.requestId(), makeRequestError( *finishedReq, msg ) );
+          }
+          // when we are jammed we need to wait until devices are free again
+          // we will forcefully push the request back into the same queue and bypass the scheduler
+          auto url = _runningReq->activeUrl();
+          _runningReq->clearForRestart();
+          if ( url )
+            _runningReq->setActiveUrl( *url );
+          queue.enqueue( _runningReq, ProvideQueue::SchedulePolicy::AfterNextDetach );
+          return;
+        }
+
       }
     }
 
@@ -1185,5 +1248,4 @@ namespace zyppng {
     }
     return ProvideItem::authenticationRequired( queue, req, baseUrl, lastTimestamp, extraFields );
   }
-
 }

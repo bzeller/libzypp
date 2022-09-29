@@ -41,6 +41,7 @@ namespace zyppng
     std::string _label;
     unsigned _medianr = 0U;
     zypp::Pathname _verifyDataPath;
+    bool _failOnJammed = false;
 
   public:
     /** Offer default Impl. */
@@ -119,6 +120,17 @@ namespace zyppng
     return *this;
   }
 
+  bool ProvideMediaSpec::failOnJammed () const
+  {
+    return _pimpl->_failOnJammed;
+  }
+
+  ProvideMediaSpec &ProvideMediaSpec::setFailOnJammed ( const bool set)
+  {
+    _pimpl->_failOnJammed = set;
+    return *this;
+  }
+
   HeaderValueMap &ProvideMediaSpec::customHeaders()
   { return _pimpl->_customHeaders; }
 
@@ -171,7 +183,6 @@ namespace zyppng
   : _pimpl( new Impl() )
   {
     setDownloadSize( loc.downloadSize() );
-    setOptional( loc.optional() );
     setChecksum( loc.checksum() );
     setOpenSize( loc.openSize() );
     setOpenChecksum( loc.openChecksum() );
@@ -194,12 +205,6 @@ namespace zyppng
 
   ProvideFileSpec &ProvideFileSpec::setCheckExistsOnly(const bool set)
   { _pimpl->_checkExistsOnly = set; return *this; }
-
-  bool ProvideFileSpec::optional() const
-  { return _pimpl->_optional; }
-
-  ProvideFileSpec & ProvideFileSpec::setOptional( bool val_r )
-  { _pimpl->_optional = (val_r); return *this; }
 
   const zypp::ByteCount & ProvideFileSpec::downloadSize() const
   { return _pimpl->_downloadSize; }

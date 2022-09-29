@@ -707,7 +707,7 @@ namespace zypp
 
             return provider_r->attachMedia( url, zyppng::ProvideMediaSpec( rInfo->name() ))
             | mbind( [ provider_r, pathname = file_url.getPathName() ]( zyppng::ProvideMediaHandle &&mediaHandle ){
-                return provider_r->provide( mediaHandle, pathname, zyppng::ProvideFileSpec().setOptional(true) );
+                return provider_r->provide( mediaHandle, pathname, zyppng::ProvideFileSpec() );
               })
             | mbind( [sharedTempKeyRing]( zyppng::ProvideRes &&res ) {
 

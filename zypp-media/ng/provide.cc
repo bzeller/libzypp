@@ -58,6 +58,9 @@ namespace zyppng {
         case RestartAttach:
           reasonStr = "RestartAttach";
           break;
+        case DetachMedium:
+          reasonStr = "DetachMedium";
+          break;
       }
       DBG << "Triggering the schedule timer (" << reasonStr << ")" << std::endl;
     }
@@ -118,7 +121,7 @@ namespace zyppng {
         continue;
       }
       if ( iMedia->_workerType == ProvideQueue::Config::Downloading ) {
-        // we keep the information around for an hour so we do not constantly download the media files for no reasonDD
+        // we keep the information around for an hour so we do not constantly download the media files for no reason
         if ( std::chrono::steady_clock::now() - iMedia->_idleSince >= std::chrono::hours(1) ) {
           MIL << "Detaching medium " << iMedia->_name << " for baseUrl " << iMedia->_attachedUrl << std::endl;
           iMedia = _attachedMediaInfos.erase(iMedia);
@@ -1041,7 +1044,11 @@ namespace zyppng {
     }
 
     // only unref'ing here, the scheduler will generate a message to the queues if needed
+    MIL << "UNREF of media: " << mediaRef << std::endl;
     i->unref();
+
+    if ( i->isIdle() )
+      d->schedule( ProvidePrivate::ScheduleReason::DetachMedium );
   }
 
   AsyncOpRef< expected<ProvideRes> > Provide::provide( const std::vector<zypp::Url> &urls, const ProvideFileSpec &request )

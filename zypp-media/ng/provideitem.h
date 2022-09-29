@@ -183,6 +183,11 @@ namespace zyppng
      */
     void updateState( const State newState );
 
+    /*!
+     * Create a exception_ptr corresponding to the error in \a msg.
+     */
+    std::exception_ptr makeRequestError ( const ProvideRequest &finishedReq, const ProvideMessage &msg ) const;
+
     void setFinished ();
 
   protected:

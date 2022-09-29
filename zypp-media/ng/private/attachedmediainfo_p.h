@@ -42,6 +42,10 @@ namespace zyppng {
       }
     }
 
+    bool isIdle () const {
+      return (_refCount == 0);
+    }
+
     /*!
      * Returns true if \a other requests the same medium as this instance
      */

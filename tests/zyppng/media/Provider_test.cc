@@ -5,6 +5,7 @@
 #include <zypp-media/auth/CredentialManager>
 #include <zypp-core/OnMediaLocation>
 #include <zypp-core/zyppng/base/EventLoop>
+#include <zypp-core/zyppng/base/Timer>
 #include <zypp-core/Pathname.h>
 #include <zypp-core/Url.h>
 #include <zypp-core/base/UserRequestException>
@@ -843,10 +844,12 @@ BOOST_AUTO_TEST_CASE( tvm_jammed )
 
   auto op1 = prov->attachMedia( zypp::Url("tvm:/"), zyppng::ProvideMediaSpec("CD Test Set")
                                                 .setMediaFile( devRoot / (std::string("cd") + zypp::str::numstring(1)) / (std::string("media.") + zypp::str::numstring(1))  / "media" )
-                                                .setMedianr(1));
+                                                .setMedianr(1)
+                                                .setFailOnJammed(true));
   auto op2 = prov->attachMedia( zypp::Url("tvm:/"), zyppng::ProvideMediaSpec("CD Test Set")
                                                 .setMediaFile( devRoot / (std::string("cd") + zypp::str::numstring(2)) / (std::string("media.") + zypp::str::numstring(2))  / "media" )
-                                                .setMedianr(2));
+                                                .setMedianr(2)
+                                                .setFailOnJammed(true));
 
 
 
@@ -912,7 +915,8 @@ BOOST_AUTO_TEST_CASE( tvm_jammed_release )
 
   auto op1 = prov->attachMedia( zypp::Url("tvm:/"), zyppng::ProvideMediaSpec("CD Test Set")
                                                 .setMediaFile( devRoot / (std::string("cd") + zypp::str::numstring(1)) / (std::string("media.") + zypp::str::numstring(1))  / "media" )
-                                                .setMedianr(1));
+                                                .setMedianr(1)
+                                                .setFailOnJammed(true));
 
   zyppng::AsyncOpRef<zyppng::expected<zyppng::Provide::MediaHandle>> op2;
   zyppng::AsyncOpRef<zyppng::expected<zyppng::Provide::MediaHandle>> op3;
@@ -930,7 +934,8 @@ BOOST_AUTO_TEST_CASE( tvm_jammed_release )
     attach1Success = true;
     op2 = prov->attachMedia( zypp::Url("tvm:/"), zyppng::ProvideMediaSpec("CD Test Set")
                                                 .setMediaFile( devRoot / (std::string("cd") + zypp::str::numstring(2)) / (std::string("media.") + zypp::str::numstring(2))  / "media" )
-                                                .setMedianr(2));
+                                                .setMedianr(2)
+                                                .setFailOnJammed(true));
 
     op2->sigReady().connect([&](){
       if ( !op2->get().is_valid() ) {
@@ -941,7 +946,8 @@ BOOST_AUTO_TEST_CASE( tvm_jammed_release )
 
         op3 = prov->attachMedia( zypp::Url("tvm:/"), zyppng::ProvideMediaSpec("CD Test Set")
                                                 .setMediaFile( devRoot / (std::string("cd") + zypp::str::numstring(2)) / (std::string("media.") + zypp::str::numstring(2))  / "media" )
-                                                .setMedianr(2));
+                                                .setMedianr(2)
+                                                .setFailOnJammed(true));
         op3->sigReady().connect( [&]() {
           ev->quit();
           if ( !op3->get() )
@@ -970,6 +976,123 @@ BOOST_AUTO_TEST_CASE( tvm_jammed_release )
   BOOST_REQUIRE( attach3Success );
   BOOST_REQUIRE( !op2->get().is_valid() );
 }
+
+class ProvideJammedStatus : public zyppng::ProvideStatus
+{
+  public:
+    ProvideJammedStatus( zyppng::ProvideRef parent ) : ProvideStatus( parent ) {}
+
+    void requestStart ( zyppng::ProvideItem &item, uint32_t reqId, const zypp::Url &url, const zyppng::AnyMap &extraData = {} ) override
+    {
+      requestsStarted++;
+    }
+
+    void requestDone     ( zyppng::ProvideItem &item, uint32_t reqId, const zyppng::AnyMap &extraData = {} ) override
+    {
+      requestsDone++;
+    }
+
+    void requestFailed   ( zyppng::ProvideItem &item, uint32_t reqId, const std::exception_ptr err, const zyppng::AnyMap &requestData = {} ) override
+    {
+      requestsFailed++;
+    }
+
+    int requestsStarted = 0;
+    int requestsFailed  = 0;
+    int requestsDone    = 0;
+};
+
+BOOST_AUTO_TEST_CASE( tvm_jammed_wait )
+{
+  using namespace zyppng::operators;
+
+  auto ev = zyppng::EventLoop::create ();
+
+  const auto &workerPath = zypp::Pathname ( TESTS_BUILD_DIR ).dirname() / "tools" / "workers";
+  const auto &devRoot    = zypp::Pathname ( TESTS_SRC_DIR ) / "zyppng" / "data" / "provide";
+
+  zypp::filesystem::TmpDir provideRoot;
+
+  auto prov = zyppng::Provide::create ( provideRoot );
+  std::shared_ptr<ProvideJammedStatus> stats = std::make_shared<ProvideJammedStatus>( prov );
+  prov->setWorkerPath ( workerPath );
+  prov->setStatusTracker( stats );
+
+  bool gotMediaChange = false;
+
+  zypp::proto::test::TVMSettings devSet;
+  auto dev = devSet.add_devices();
+  dev->set_name("/fakedev/tvm/slot1");
+  dev->set_insertedpath( (devRoot/"cd1").asString() );
+  writeTVMConfig( provideRoot, devSet );
+
+  auto timer = zyppng::Timer::create();
+
+  prov->sigMediaChangeRequested().connect([&]( const std::string &ref, const std::string &label, const int32_t mediaNr, const std::vector<std::string> &devices, const std::optional<std::string> &desc ){
+    gotMediaChange = true;
+    devSet.mutable_devices(0)->set_insertedpath( (devRoot/"cd2").asString() );
+    writeTVMConfig( provideRoot, devSet );
+    return zyppng::Provide::RETRY;
+  });
+
+  prov->start();
+
+  auto op1 = prov->attachMedia( zypp::Url("tvm:/"), zyppng::ProvideMediaSpec("CD Test Set")
+                                                .setMediaFile( devRoot / (std::string("cd") + zypp::str::numstring(1)) / (std::string("media.") + zypp::str::numstring(1))  / "media" )
+                                                .setMedianr(1)
+                                                .setFailOnJammed(true));
+  auto op2 = prov->attachMedia( zypp::Url("tvm:/"), zyppng::ProvideMediaSpec("CD Test Set")
+                                                .setMediaFile( devRoot / (std::string("cd") + zypp::str::numstring(2)) / (std::string("media.") + zypp::str::numstring(2))  / "media" )
+                                                .setMedianr(2));
+
+
+  bool attach1Success = false;
+  const auto &readyCB1 = [&](){
+    if ( op1->get() ) {
+      attach1Success = true;
+      timer->start( 1000 );
+    } else {
+      ev->quit();
+    }
+  };
+
+  const auto &readyCB2 = [&](){
+    ev->quit();
+  };
+
+  op1->sigReady().connect( readyCB1 );
+  op2->sigReady().connect( readyCB2 );
+
+  int timeoutHit = 0;
+  timer->sigExpired().connect( [&]( auto & ){
+    if ( op1 && op1->isReady() ) {
+      op1.reset();
+      return;
+    }
+    if ( !op2->isReady() ) {
+      timeoutHit++;
+    }
+    if ( timeoutHit >= 5 ) {
+      ev->quit();
+    }
+  });
+
+  BOOST_REQUIRE( !op1->isReady() );
+  BOOST_REQUIRE( !op2->isReady() );
+
+
+  if ( !op1->isReady() && !op2->isReady() )
+    ev->run();
+
+  BOOST_REQUIRE( gotMediaChange );
+  BOOST_REQUIRE_LE( timeoutHit, 5 );
+  //BOOST_REQUIRE_EQUAL( stats->requestsStarted, 3 );
+  BOOST_REQUIRE_EQUAL( stats->requestsFailed, 1 );
+  BOOST_REQUIRE_EQUAL( stats->requestsDone, 2 );
+  BOOST_REQUIRE( attach1Success );
+  BOOST_REQUIRE( op2->get().is_valid() );
+}
+
 
 
 #if 0

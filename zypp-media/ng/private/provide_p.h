@@ -60,6 +60,7 @@ namespace zyppng {
       EnqueueItem,
       EnqueueReq,
       RestartAttach,
+      DetachMedium,
       FinishReq
     };
 

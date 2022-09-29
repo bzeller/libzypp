@@ -89,10 +89,11 @@ namespace zyppng {
   }
 
 
-  void ProvideQueue::enqueue( ProvideRequestRef request )
+  void ProvideQueue::enqueue( ProvideRequestRef request, const SchedulePolicy policy )
   {
     Item i;
-    i._request   = request;
+    i._request     = request;
+    i._schedPolicy = policy;
     i._request->provideMessage().setRequestId( nextRequestId() );
     request->setCurrentQueue( shared_this<ProvideQueue>() );
     _waitQueue.push_back( std::move(i) );
@@ -131,11 +132,10 @@ namespace zyppng {
 
   std::list<ProvideQueue::Item>::iterator ProvideQueue::dequeueActive( std::list<Item>::iterator it )
   {
+    // \attention: this function should NOT touch the RequestRef inside the Item, the Request could be requeued already
+    // changing it here would break things
     if ( it == _activeItems.end() )
       return it;
-
-    if ( it->_request )
-      it->_request->setCurrentQueue( nullptr );
 
     auto i = _activeItems.erase(it);
     _parent.schedule ( ProvidePrivate::FinishReq ); // Trigger the scheduler
@@ -211,9 +211,16 @@ namespace zyppng {
     if ( _queueShuttingDown )
       return;
 
+    constexpr auto isSchedulableItem = []( const Item &i ) { return i._schedPolicy == SchedulePolicy::Now; };
+
     while ( _waitQueue.size() && canScheduleMore() ) {
-      auto item = std::move( _waitQueue.front() );
-      _waitQueue.pop_front();
+
+      auto i = std::find_if( _waitQueue.begin(), _waitQueue.end(), isSchedulableItem );
+      if ( i == _waitQueue.end() )
+        break;
+
+      auto item = std::move( *i );
+      _waitQueue.erase( i );
 
       auto &reqRef = item._request;
       if ( !reqRef->activeUrl() ) {
@@ -244,6 +251,7 @@ namespace zyppng {
 
   bool ProvideQueue::canScheduleMore() const
   {
+    // attention, if you change this code remember the waitQueue contains paused items as well, e.g. AfterNextDetach ones
     return ( _activeItems.size() == 0 || ( _capabilities.cfg_flags () & zypp::proto::Capabilities::Pipeline ) == zypp::proto::Capabilities::Pipeline );
   }
 
@@ -451,6 +459,8 @@ namespace zyppng {
 
           if ( req._state == Item::Cancelling ) {
             req._state = Item::Finished;
+            if ( reqIter->_request )
+              reqIter->_request->setCurrentQueue( nullptr );
             dequeueActive( reqIter );
             continue;
           }
@@ -490,15 +500,20 @@ namespace zyppng {
                 // unlikely this can happen but better be safe than sorry
                 if ( !dataRef ) {
                   req._state = Item::Finished;
+
                   reqRef->setCurrentQueue(nullptr);
                   auto resp = ProvideMessage::createErrorResponse ( provMsg->requestId(), ProvideMessage::Code::InternalError, "File vanished between downloading and adding it to cache." );
                   if ( reqRef->owner() )
                     reqRef->owner()->finishReq( *this, reqRef, resp );
+
                   dequeueActive( reqIter );
                   continue;
                 }
               }
             }
+          } else if ( code == ProvideMessage::Code::DetachFinished ) {
+            // restart all pending items
+            std::for_each( _waitQueue.begin(), _waitQueue.end(), []( Item &item ) { if ( item._schedPolicy == SchedulePolicy::AfterNextDetach) item._schedPolicy = SchedulePolicy::Now;  } );
           }
 
           // send the message to the item and dequeue
@@ -513,6 +528,7 @@ namespace zyppng {
 
           if ( req._state == Item::Cancelling ) {
             req._state = Item::Finished;
+            reqRef->setCurrentQueue(nullptr);
             dequeueActive( reqIter );
             continue;
           }
@@ -532,15 +548,16 @@ namespace zyppng {
           // redir is like a finished message, we can simply forgot about a cancelling request
           if ( req._state == Item::Cancelling ) {
             req._state = Item::Finished;
+            reqRef->setCurrentQueue(nullptr);
             dequeueActive( reqIter );
             continue;
           }
 
           // send the message to the item and dequeue
+          req._state = Item::Finished;
           reqRef->setCurrentQueue(nullptr);
           if ( reqRef->owner() )
             reqRef->owner()->finishReq( *this, reqRef, *provMsg );
-          req._state = Item::Finished;
           dequeueActive( reqIter );
           continue;
 
