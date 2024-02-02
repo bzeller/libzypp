@@ -213,6 +213,13 @@ namespace zyppng {
     return false;
   }
 
+  namespace operators {
+    template <typename Container, typename Predicate >
+    Container filter ( Container &&in, Predicate &&p ) {
+      std::remove_if( std::forward<Container>(in).begin(), std::forward<Container>(in).end(), std::not_fn( std::forward<Predicate>(p) ) );
+      return in;
+    }
+  }
 
 }
 

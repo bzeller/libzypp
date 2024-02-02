@@ -289,6 +289,7 @@ INSTALL(  FILES
 
 SET( zypp_ng_SRCS
   ng/context.cc
+  ng/repomanager.cc
   ng/userrequest.cc
   ng/repo/downloader.cc
   ng/repo/refresh.cc
@@ -309,6 +310,8 @@ SET( zypp_ng_SRCS
 SET( zypp_ng_HEADERS
   ng/context.h
   ng/Context
+  ng/repomanager.h
+  ng/RepoManager
   ng/userrequest.h
   ng/UserRequest
   ng/repo/downloader.h
