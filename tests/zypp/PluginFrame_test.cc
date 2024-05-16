@@ -39,7 +39,7 @@ BOOST_AUTO_TEST_CASE(PluginFrameCtorAssign)
   BOOST_CHECK_EQUAL( bool(g), !g.empty() );
   BOOST_CHECK_EQUAL( g.empty(), false );
   BOOST_CHECK_EQUAL( g.command(), "command" );
-  BOOST_CHECK_EQUAL( g.body(), "body");
+  BOOST_CHECK_EQUAL( g.body().asString(), "body");
   BOOST_CHECK_EQUAL( g.headerEmpty(), true );
   BOOST_CHECK_EQUAL( (f == g), false );
   BOOST_CHECK_EQUAL( (f != g), true );

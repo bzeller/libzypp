@@ -18,6 +18,7 @@
 
 #include <zypp/base/PtrTypes.h>
 
+#include <zypp-core/ByteArray.h>
 #include <zypp-core/rpc/PluginFrameException.h>
 
 ///////////////////////////////////////////////////////////////////
@@ -69,6 +70,11 @@ namespace zypp
        */
       PluginFrame(const std::string & command_r, std::string body_r );
 
+      /** Ctor taking command and body
+       * \throw PluginFrameException If \ref setCommand throws
+       */
+      PluginFrame(const std::string & command_r, ByteArray body_r );
+
       /** Ctor taking the command and a HeaderInitializerList
        * \throw PluginFrameException If \ref setCommand throws
        */
@@ -77,7 +83,7 @@ namespace zypp
       /** Ctor taking command, body and a HeaderInitializerList
        * \throw PluginFrameException If \ref setCommand throws
        */
-      PluginFrame(const std::string & command_r, std::string body_r, HeaderInitializerList contents_r );
+      PluginFrame(const std::string & command_r, ByteArray body_r, HeaderInitializerList contents_r );
 
       /** Ctor reading frame data from a stream
        * \throw PluginFrameException On error reading from stream
@@ -115,17 +121,17 @@ namespace zypp
       {return command() == enomethodCommand(); }
 
       /** Return the frame body. */
-      const std::string & body() const;
+      const ByteArray & body() const;
 
       /** Return a reference to the frame body.
        * This may avoid creating unnecessary copies if you
        * want to manipulate large body data.
        * \code
-       *   std::string tmp;
+       *   ByteArray tmp;
        *   frame.bodyRef().swap( tmp );
        * \endcode
        */
-      std::string & bodyRef();
+      ByteArray & bodyRef();
 
       /** Set the frame body */
       void setBody( const std::string & body_r );
