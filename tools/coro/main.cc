@@ -23,11 +23,13 @@ struct std::coroutine_traits<zyppng::AsyncOpRef<T>, Args...>
   struct CoroAsyncOp : public zyppng::AsyncOp<T>
   {
     CoroAsyncOp( std::coroutine_handle<promise_type> coro ) : _coroHandle( std::move(coro) ) {
+      // BUG ! this would not work if the CoroAsyncOp is used in a pipeline!
       this->sigReady().connect([this](){ _markedDone = true; });
     }
     ~CoroAsyncOp() override {
       // if the coroutine is not done, make sure to destroy it when the promise handle is destroyed
-      if ( !_markedDone )
+      std::cout << "Coroutine handle valid: " << _coroHandle.operator bool() << " marked done: " << _markedDone << std::endl;
+      if ( _markedDone )
         _coroHandle.destroy();
     }
     bool _markedDone = false;
