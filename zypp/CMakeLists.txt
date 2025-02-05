@@ -874,6 +874,9 @@ INSTALL(  FILES
   DESTINATION ${INCLUDE_INSTALL_DIR}/zypp/media/proxyinfo
 )
 
+
+include( ../zypp-logic/CMakeLists.txt )
+
 SET( zypp_lib_SRCS
 ${zypp_misc_SRCS}
 ${zypp_pool_SRCS}
@@ -901,6 +904,7 @@ ${zypp_sat_SRCS}
 ${zypp_sat_detail_SRCS}
 ${zypp_EARLY_SRCS}
 ${zypp_base_SRCS}
+${zypp_logic_srcs}
 )
 
 SET( zypp_lib_HEADERS
@@ -934,6 +938,7 @@ ${zypp_core_base_compat_HEADERS}
 ${zypp_core_url_compat_HEADERS}
 ${zypp_core_parser_compat_HEADERS}
 ${zypp_media_compat_HEADERS}
+${zypp_logic_headers}
 )
 
 # Default loggroup for all files
