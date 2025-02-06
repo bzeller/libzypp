@@ -9,6 +9,7 @@
 #ifndef ZYPP_NG_CONTEXT_INCLUDED
 #define ZYPP_NG_CONTEXT_INCLUDED
 
+#include <zypp-core/fs/TmpPath.h>
 #include <zypp-core/zyppng/async/AsyncOp>
 #include <zypp-core/zyppng/ui/UserInterface>
 #include <zypp/RepoManager.h>
@@ -68,6 +69,8 @@ namespace zyppng {
 #endif
 
   private:
+    zypp::filesystem::TmpDir _providerDir;
+    ProvideRef _provider;
 
   };
 

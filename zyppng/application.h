@@ -6,30 +6,31 @@
 |                         /_____||_| |_| |_|                           |
 |                                                                      |
 \---------------------------------------------------------------------*/
+#ifndef ZYPP_NG_APPLICATION_INCLUDED
+#define ZYPP_NG_APPLICATION_INCLUDED
 
-#include "private/userinterface_p.h"
-#include <zypp-core/zyppng/ui/UserRequest>
+#include <zypp-core/zyppng/base/base.h>
+#include <zypp-core/zyppng/base/zyppglobal.h>
 
 namespace zyppng {
 
-  ZYPP_IMPL_PRIVATE(UserInterface)
+  ZYPP_FWD_DECL_TYPE_WITH_REFS( Application );
+  ZYPP_FWD_DECL_TYPE_WITH_REFS( EventDispatcher );
 
-  ZYPP_IMPL_PRIVATE_CONSTR( UserInterface ) : Base ( *( new UserInterfacePrivate(*this) ) ) { }
 
-  UserInterface::UserInterface( UserInterfacePrivate &d ) : Base(d)
-  { }
+  class Application : public Base {
 
-  void UserInterface::sendUserRequest(const UserRequestRef& event)
-  {
-    Z_D();
-    d->_sigEvent.emit( event );
-  }
+    Application();
+    ~Application() override;
 
-  SignalProxy<void (UserRequestRef)> UserInterface::sigEvent()
-  {
-    return d_func()->_sigEvent;
-  }
+    static ApplicationRef create();
+    static ApplicationRef instance();
 
-  UserInterface::UserInterface() : zyppng::UserInterface( private_constr_t() )
-  {}
+
+  private:
+    EventDispatcherRef _eventDispatcher;
+  };
+
 }
+
+#endif //ZYPP_NG_APPLICATION_INCLUDED

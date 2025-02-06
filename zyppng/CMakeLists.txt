@@ -7,10 +7,12 @@ include( ../zypp-logic/CMakeLists.txt )
 
 
 SET ( zyppng_headers
+  application.h
   context.h
 )
 
 SET ( zyppng_srcs
+  application.cc
   context.cc
 )
 
@@ -98,7 +100,7 @@ target_include_directories( zyppng-objlib PUBLIC ${RPM_INCLUDE_DIR})
 # fix includes not relative to rpm
 target_include_directories( zyppng-objlib PUBLIC ${RPM_INCLUDE_DIR}/rpm)
 
-target_compile_definitions( zyppng-objlib PUBLIC ZYPP_USE_CORO )
+target_compile_definitions( zyppng-objlib PUBLIC ZYPP_USE_CORO LIBSOLV_SOLVABLE_PREPEND_DEP )
 
 # rpm verify function and callback states were introduced in rpm-4.15
 if( RPM_LIB_VER VERSION_GREATER_EQUAL "4.15.0"  AND  RPM_LIB_VER VERSION_LESS "5.0.0")
