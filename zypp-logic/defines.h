@@ -37,4 +37,4 @@ namespace zyppng {
 
 
 
-#endif
+#endif //ZYPP_LOGIC_DEFINES_INCLUDED

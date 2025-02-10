@@ -54,32 +54,25 @@ function(add_zyppng_lib target shared_or_static )
     message(NOTICE "Building ${target} shared")
   endif()
 
-  ADD_LIBRARY( ${target} ${shared_or_static} )
+  add_library( ${target} ${shared_or_static} )
 
-  SET_TARGET_PROPERTIES ( ${target} PROPERTIES VERSION "${LIBZYPP_VERSION_INFO}" )
-  SET_TARGET_PROPERTIES ( ${target} PROPERTIES SOVERSION "${LIBZYPP_SOVERSION_INFO}" )
+  set_target_properties ( ${target} PROPERTIES VERSION "${LIBZYPP_VERSION_INFO}" )
+  set_target_properties ( ${target} PROPERTIES SOVERSION "${LIBZYPP_SOVERSION_INFO}" )
 
   target_link_libraries( ${target} PRIVATE zypp_lib_compiler_flags )
-  TARGET_LINK_LIBRARIES( ${target} PRIVATE zypp-objlib )
+  target_link_libraries( ${target} PRIVATE zyppng-objlib )
   target_link_libraries( ${target} PRIVATE commit-proto-obj )
 
   # CAUTION, link those libs always first and always in that order,
   # otherwise you get symbol lookup errors when linking against libzypp
-  TARGET_LINK_LIBRARIES( ${target} ${_link_mode} zypp-common )
-  TARGET_LINK_LIBRARIES( ${target} ${_link_mode} zypp-curl )
-  TARGET_LINK_LIBRARIES( ${target} ${_link_mode} zypp-media )
+  target_link_libraries( ${target} ${_link_mode} zypp-common )
+  target_link_libraries( ${target} ${_link_mode} zypp-media )
+  target_link_libraries( ${target} ${_link_mode} zypp-core )
 
-
-  # CAUTION, link zypp-tui.a at last, to prevent undefined references
-  # in case tui functions are used in libzypp.
-  TARGET_LINK_LIBRARIES( ${target} ${_link_mode} zypp-tui )
-
-  TARGET_LINK_LIBRARIES( ${target} ${_link_mode} zypp-core )
-
-  TARGET_LINK_LIBRARIES( ${target} ${_link_mode} ${LibSolv_LIBRARIES} )
-  TARGET_LINK_LIBRARIES( ${target} ${_link_mode} ${RPM_LIBRARY} ${RPMIO_LIBRARY} )
-  TARGET_LINK_LIBRARIES( ${target} ${_link_mode} ${GETTEXT_LIBRARIES} )
-  TARGET_LINK_LIBRARIES( ${target} ${_link_mode} ${Boost_THREAD_LIBRARY})
+  target_link_libraries( ${target} ${_link_mode} ${LibSolv_LIBRARIES} )
+  target_link_libraries( ${target} ${_link_mode} ${RPM_LIBRARY} ${RPMIO_LIBRARY} )
+  target_link_libraries( ${target} ${_link_mode} ${GETTEXT_LIBRARIES} )
+  target_link_libraries( ${target} ${_link_mode} ${Boost_THREAD_LIBRARY})
   target_link_libraries( ${target} ${_link_mode} ${YAML_CPP_LIBRARIES})
 
   IF ( UDEV_FOUND )
