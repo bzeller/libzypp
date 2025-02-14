@@ -82,6 +82,11 @@ class WebServer
   zypp::media::TransferSettings transferSettings () const;
 
   /**
+   * Returns the CA path for this server
+   */
+  zypp::Pathname caPath() const;
+
+  /**
    * shows the log of last run
    */
   std::string log() const;

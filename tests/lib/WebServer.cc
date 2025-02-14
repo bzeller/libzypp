@@ -513,7 +513,6 @@ int WebServer::port() const
     return _pimpl->port();
 }
 
-
 Url WebServer::url() const
 {
     Url url;
@@ -530,8 +529,13 @@ Url WebServer::url() const
 media::TransferSettings WebServer::transferSettings() const
 {
   media::TransferSettings set;
-  set.setCertificateAuthoritiesPath(zypp::Pathname(TESTS_SRC_DIR)/"data/webconf/ssl/certstore");
+  set.setCertificateAuthoritiesPath(caPath());
   return set;
+}
+
+filesystem::Pathname WebServer::caPath() const
+{
+  return ( zypp::Pathname(TESTS_SRC_DIR)/"data/webconf/ssl/certstore" );
 }
 
 void WebServer::stop()
