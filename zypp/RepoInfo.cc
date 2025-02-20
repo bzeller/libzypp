@@ -168,7 +168,6 @@ namespace zypp
     RepoVariablesReplacedUrlList & gpgKeyUrls()
     { return _gpgKeyUrls; }
 
-
     const std::set<std::string> & contentKeywords() const
     { hasContent()/*init if not yet done*/; return _keywords.second; }
 

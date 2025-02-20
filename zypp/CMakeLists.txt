@@ -551,6 +551,7 @@ SET( zypp_target_SRCS
   target/RequestedLocalesFile.cc
   target/SolvIdentFile.cc
   target/HardLocksFile.cc
+  target/commitpackagepreloader.cc
   target/CommitPackageCache.cc
   target/CommitPackageCacheImpl.cc
   target/CommitPackageCacheReadAhead.cc
@@ -572,6 +573,11 @@ SET( zypp_target_HEADERS
   target/TargetCallbackReceiver.h
   target/TargetException.h
   target/TargetImpl.h
+)
+
+
+SET( zypp_target_detail_HEADERS
+  target/private/commitpackagepreloader_p.h
 )
 
 INSTALL(  FILES
@@ -927,6 +933,7 @@ ${zypp_repo_HEADERS}
 ${zypp_source_susetags_HEADERS}
 ${zypp_target_modalias_HEADERS}
 ${zypp_target_HEADERS}
+${zypp_target_detail_HEADERS}
 ${zypp_pool_HEADERS}
 ${zypp_misc_HEADERS}
 ${zypp_core_compat_HEADERS}
