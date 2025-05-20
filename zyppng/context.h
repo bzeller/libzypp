@@ -56,7 +56,7 @@ namespace zyppng {
     zypp::ResPool pool();
 
     /** Pool of ui::Selectable.
-     * Based on the ResPool, ui::Selectable groups ResObjetcs of
+     * Based on the ResPool, ui::Selectable groups ResObjects of
      * same kind and name.
     */
     zypp::ResPoolProxy poolProxy();
