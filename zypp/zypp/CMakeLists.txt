@@ -612,6 +612,7 @@ SET( zypp_misc_HEADERS
   misc/CheckAccessDeleted.h
   misc/TestcaseSetup.h
   misc/LoadTestcase.h
+  misc/RunTestcase.h
 )
 
 SET( zypp_misc_SRCS
@@ -619,6 +620,7 @@ SET( zypp_misc_SRCS
   misc/CheckAccessDeleted.cc
   misc/TestcaseSetup.cc
   misc/LoadTestcase.cc
+  misc/RunTestcase.cc
 )
 
 INSTALL( FILES
