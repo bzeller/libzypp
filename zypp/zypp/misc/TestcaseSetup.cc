@@ -1,7 +1,16 @@
 #include "TestcaseSetupImpl.h"
 
+#include <zypp/ZYpp.h>
+#include <zypp/ZYppFactory.h>
+#include <zypp/Resolver.h>
+#include <zypp/ResPool.h>
+#include <zypp/VendorAttr.h>
+#include <zypp/target/modalias/Modalias.h>
+
 namespace zypp::misc::testcase
 {
+  /// Implementation — declared in TestcaseSetup.h, callable from LoadTestcase.cc too.
+  void applyLockEntry( const TestcaseSetup::LockEntry & entry, ResPool & pool );
   RepoData::RepoData() : _pimpl( new RepoDataImpl )
   {}
 
@@ -97,6 +106,9 @@ namespace zypp::misc::testcase
 
   const std::vector<ForceInstall> &TestcaseSetup::forceInstallTasks() const
   { return _pimpl->forceInstallTasks; }
+
+  const std::vector<TestcaseSetup::LockEntry> &TestcaseSetup::locks() const
+  { return _pimpl->locks; }
 
   bool TestcaseSetup::set_licence() const
   { return _pimpl->set_licence; }
@@ -260,4 +272,67 @@ namespace zypp::misc::testcase
     return *_pimpl;
   }
 
+  bool TestcaseSetup::applySetup( zypp::RepoManager &manager, ApplySetupFlags flags_r ) const
+  {
+    // Repos/arch/hardware are always applied via the existing overload.
+    if ( !applySetup( manager ) )
+      return false;
+
+    if ( flags_r.testFlag( AS_LOCALES ) )
+    {
+      base::SetTracker<LocaleSet> lt = localesTracker();
+      lt.removed().insert( lt.current().begin(), lt.current().end() );
+      sat::Pool::instance().initRequestedLocales( lt.removed() );
+      lt.added().insert( lt.current().begin(), lt.current().end() );
+      sat::Pool::instance().setRequestedLocales( lt.added() );
+    }
+
+    if ( flags_r.testFlag( AS_AUTOINSTALLED ) )
+    {
+      sat::Pool::instance().setAutoInstalled( autoinstalled() );
+    }
+
+    if ( flags_r.testFlag( AS_VENDOR_LISTS ) )
+    {
+      for ( const auto & vlist : vendorLists() )
+        VendorAttr::noTargetInstance().addVendorList( vlist );
+    }
+
+    if ( flags_r.testFlag( AS_MODALIAS ) )
+    {
+      target::Modalias::instance().modaliasList( modaliasList() );
+    }
+
+    if ( flags_r.testFlag( AS_MULTIVERSION ) )
+    {
+      ZConfig::instance().multiversionSpec( multiversionSpec() );
+    }
+
+    if ( flags_r.testFlag( AS_LOCKS ) )
+    {
+      ResPool pool = ResPool::instance();
+      for ( const auto & entry : locks() )
+        applyLockEntry( entry, pool );
+    }
+
+    if ( flags_r.testFlag( AS_SOLVER_FLAGS ) )
+    {
+      Resolver_Ptr resolver = getZYpp()->resolver();
+      resolver->setFocus                   ( resolverFocus()             );
+      resolver->setIgnoreAlreadyRecommended( ignorealreadyrecommended()  );
+      resolver->setOnlyRequires            ( onlyRequires()              );
+      resolver->setForceResolve            ( forceResolve()              );
+      resolver->setCleandepsOnRemove       ( cleandepsOnRemove()         );
+      resolver->setAllowDowngrade          ( allowDowngrade()            );
+      resolver->setAllowNameChange         ( allowNameChange()           );
+      resolver->setAllowArchChange         ( allowArchChange()           );
+      resolver->setAllowVendorChange       ( allowVendorChange()         );
+      resolver->dupSetAllowDowngrade       ( dupAllowDowngrade()         );
+      resolver->dupSetAllowNameChange      ( dupAllowNameChange()        );
+      resolver->dupSetAllowArchChange      ( dupAllowArchChange()        );
+      resolver->dupSetAllowVendorChange    ( dupAllowVendorChange()      );
+    }
+
+    return true;
+  }
 }

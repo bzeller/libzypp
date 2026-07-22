@@ -12,11 +12,17 @@
 #include "LoadTestcase.h"
 #include "HelixHelpers.h"
 #include "YamlTestcaseHelpers.h"
+#include "TestcaseSetupImpl.h"
 #include <zypp/PathInfo.h>
 #include <zypp-core/base/LogControl.h>
+#include <zypp/ZYpp.h>
+#include <zypp/Resolver.h>
+#include <zypp/ResPool.h>
+#include <zypp/ResFilters.h>
+#include <zypp/Capability.h>
+#include <zypp/sat/Pool.h>
 
 namespace zypp::misc::testcase {
-
   static const std::string helixControlFile = "solver-test.xml";
   static const std::string yamlControlFile  = "zypp-control.yaml";
 
@@ -211,12 +217,26 @@ namespace zypp::misc::testcase {
 
     switch (t) {
       case LoadTestcase::Helix:
-        return _pimpl->loadHelix( path / helixControlFile, err );
+        if ( !_pimpl->loadHelix( path / helixControlFile, err ) )
+          return false;
+        break;
       case LoadTestcase::Yaml:
-        return _pimpl->loadYaml( path / yamlControlFile, err );
+        if ( !_pimpl->loadYaml( path / yamlControlFile, err ) )
+          return false;
+        break;
       default:
         return false;
     }
+
+    // ── Extract lock/keep nodes from all trials into the setup ─────────────────
+    // Done as a post-parse pass so neither parser needs to be modified.
+    // Locks are pool constraints that belong to the environment, not the job.
+    for ( const auto & trial : _pimpl->_trials )
+      for ( const auto & node : trial.nodes() )
+        if ( node.name() == "lock" || node.name() == "keep" )
+          _pimpl->_setup.data().locks.push_back( { node.name(), node.properties() } );
+
+    return true;
   }
 
   LoadTestcase::Type LoadTestcase::testcaseTypeAt(const zypp::filesystem::Pathname &path)
@@ -234,9 +254,70 @@ namespace zypp::misc::testcase {
     return _pimpl->_setup;
   }
 
+  void LoadTestcase::applyLockEntry(const TestcaseSetup::LockEntry &entry, ResPool &pool, std::ostream * out, std::ostream * err )
+  {
+    const bool isKeep = ( entry.first == "keep" );
+    const auto & props = entry.second;
+
+    auto getProp = [&]( const std::string & k ) -> std::string {
+      auto it = props.find(k);
+      return it != props.end() ? it->second : std::string();
+    };
+
+    if ( !isKeep ) {
+      std::string source_alias = getProp ("channel");
+      std::string package_name = getProp ("name");
+      if (package_name.empty())
+        package_name = getProp ("package");
+      std::string kind_name = getProp ("kind");
+      std::string version = getProp ("version");
+      if ( version.empty() )
+        version = getProp ("ver");
+      std::string release = getProp ("release");
+      if ( release.empty() )
+        release = getProp ("rel");
+      std::string architecture = getProp ("arch");
+
+      if ( version.empty() )
+      {
+        if ( kind_name.empty() )
+          kind_name = "package";
+        ui::Selectable::Ptr item = ui::Selectable::get( ResKind(kind_name), package_name );
+        if ( item )
+        {
+          item->setStatus( item->hasInstalledObj() ? ui::S_Protected : ui::S_Taboo );
+          item->setStatus( ui::S_Taboo );
+        }
+        else
+        {
+          outStream (err) << "Unknown Selectable " << kind_name << ":" << package_name << std::endl;
+        }
+      }
+      else
+      {
+        PoolItem poolItem;
+        poolItem = get_poolItem (source_alias, package_name, kind_name, version, release, architecture );
+        if (poolItem) {
+          outStream (out) << RESULT_MARKER << "Locking " << package_name << " from channel " << source_alias << poolItem << std::endl;
+          poolItem.status().setLock (true, ResStatus::USER);
+        } else {
+          outStream (err) << "Unknown package " << source_alias << "::" << package_name << std::endl;
+        }
+      }
+
+    } else {
+
+
+
+
+
+
+    }
+  }
+
   const LoadTestcase::TestcaseTrials &LoadTestcase::trialInfo() const
   {
     return _pimpl->_trials;
   }
 
-}
+} // namespace zypp::misc::testcase
